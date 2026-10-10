@@ -24,10 +24,18 @@ export function updateEconomy(world: World): void {
       if (entity.kind !== 'building' || entity.owner < 0) continue;
       if (!world.rules.buildings.get(entity.type)!.capabilities.oil) continue;
       const player = world.players[entity.owner];
-      player.credits += eco.oilPayout;
-      player.ledger.oil += eco.oilPayout;
+      const amount = scaledIncome(world, entity.owner, eco.oilPayout);
+      player.credits += amount;
+      player.ledger.oil += amount;
     }
   }
+}
+
+/** Income after the computer player's difficulty modifier (humans always earn the base amount). */
+export function scaledIncome(world: World, player: number, amount: number): number {
+  const level = world.players[player]?.ai?.difficulty;
+  const percent = level ? world.rules.ai.difficulties.get(level)?.incomePercent ?? 100 : 100;
+  return Math.floor(amount * percent / 100);
 }
 
 /** Abort a unit's autonomous task, releasing any dock lease (keeps carried cargo). */

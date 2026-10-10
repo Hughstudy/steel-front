@@ -346,7 +346,8 @@ function updatePending(world: World): void {
       if (occupant === 0 || occupant === pending.unit) continue;
       clear = false;
       const other = world.get(occupant);
-      if (other && other.next < 0 && (other.goal < 0 || tiles.includes(other.goal))) evacuate(world, other, tiles);
+      // Only the placing player's own units make way; hostile occupants keep their orders and block until they leave.
+      if (other && other.owner === pending.player && other.next < 0 && (other.goal < 0 || tiles.includes(other.goal))) evacuate(world, other, tiles);
     }
     if (!clear) continue;
     if (unit) {

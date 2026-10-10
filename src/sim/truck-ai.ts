@@ -1,7 +1,7 @@
 import type { Entity } from './entities.ts';
 import { MoveState } from './entities.ts';
 import { UNREACHED } from './pathfinder.ts';
-import { acquireDock, approachCost, leaseOf, releaseDock, renewDock } from './economy.ts';
+import { acquireDock, approachCost, leaseOf, releaseDock, renewDock, scaledIncome } from './economy.ts';
 import { touches } from './structures.ts';
 import type { World } from './world.ts';
 
@@ -162,8 +162,9 @@ function unload(world: World, truck: Entity): void {
   const amount = Math.min(world.rules.economy.unloadPerTick, truck.cargo);
   truck.cargo -= amount;
   const player = world.players[truck.owner];
-  player.credits += amount;
-  player.ledger.delivered += amount;
+  const earned = scaledIncome(world, truck.owner, amount);
+  player.credits += earned;
+  player.ledger.delivered += earned;
   renewDock(world, truck);
   if (truck.cargo <= 0) {
     releaseDock(world, truck);

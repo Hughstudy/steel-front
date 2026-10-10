@@ -129,3 +129,29 @@ These come from a headless duel harness: two sides on the open west-bank meadow 
 | 1 P-51 vs 1 Bf 109 | 8 | P-51 wins, 12.0 s |
 
 `tests/combat.test.ts` asserts the key relationships: AT guns beat equal-cost rifles on a Tiger, artillery out-ranges tanks and AT guns, and fighters counter fighters.
+
+## Computer opponent difficulty
+
+Every AI level is limited by income: it spends credits as soon as they arrive. Faster decisions alone therefore do not make a stronger opponent. Difficulty is set per level in `data/ai.json`. Two knobs carry most of the gap:
+
+- `incomePercent` scales this computer player's truck deliveries and oil payouts (Recruit 75%, Regular 100%, Veteran 130%). Human players always earn the base amount. This is an explicit, documented AI handicap/bonus, as in many RTS games.
+- `waveCommitPercent` sets how much of the army beyond the home reserve a wave commits. Veteran commits all of it (waves from 8 units, every 3000 ticks, at most 40); Recruit and Regular send exactly the scheduled size.
+
+Waves draw units round-robin across unit types, so attacks are mixed arms.
+
+Measured AI-vs-AI over 8 games per pairing (2 maps × 2 spawns × 2 factions):
+
+| Pairing | Won–lost–drawn |
+|---|---|
+| Veteran vs Recruit | 8–0–0 |
+| Veteran vs Regular | 8–0–0 |
+| Regular vs Recruit | 7–1–0 |
+
+Against a passive player who only deploys, time to defeat (Recruit / Regular / Veteran):
+
+| Map | Recruit | Regular | Veteran |
+|---|---|---|---|
+| Lowlands | 14.3 min | 9.6 min | 7.3 min |
+| Ardennes | 11.3 min | 11.1 min | 10.1 min |
+
+Each map gives both spawns two oil derricks on their own half. Even so, mirror matches are decided by terrain: the Lowlands favours the west spawn and the Ardennes the east.

@@ -6,6 +6,7 @@ import type { QueueItem } from './production.ts';
 import { constructionProblem, costOf, deployOrigin, lowPower, missingPrerequisites, ownedTypes } from './production.ts';
 import type { AiDifficulty, AiFactionPlan, BuildingDef } from './rules.ts';
 import type { Player, World } from './world.ts';
+import { ringTiles } from './structures.ts';
 
 /** One launched attack wave, kept for diagnostics and tests. */
 export interface AiWave {
@@ -404,7 +405,10 @@ function captureTargets(t: Think, snap: Snapshot): Entity[] {
   const memory = player.fog.memory;
   const origin = snap.hq ?? snap.mcv;
   if (!origin) return [];
-  const component = world.nav.componentOf(origin.kind === 'unit' ? origin.tile : player.start);
+  // The ground region the base can reach: the MCV's own tile, or any free tile around the HQ.
+  const component = origin.kind === 'unit'
+    ? world.nav.componentOf(origin.next >= 0 ? origin.next : origin.tile)
+    : ringTiles(world, world.rules.buildings.get(origin.type)!, origin.tile).map(tile => world.nav.componentOf(tile)).find(c => c >= 0) ?? -1;
   const list: Array<{ entity: Entity; d: number }> = [];
   for (const entity of world.entities) {
     if (entity.kind !== 'building' || !world.rules.buildings.get(entity.type)!.capabilities.capturable) continue;
@@ -415,7 +419,9 @@ function captureTargets(t: Think, snap: Snapshot): Entity[] {
     const lost = t.state.held.includes(entity.id);
     const known = canSee(world, player.index, entity) ? entity.owner : lost ? -2 : memory.get(entity.id)?.owner ?? -1;
     if (known !== -1) continue; // enemy-held (seen, or lost to the enemy): leave to the army
-    if (component >= 0 && world.nav.componentOf(entity.tile) < 0) continue;
+    // Engineers capture from an adjacent tile, so the approach ring (not the blocked origin) must be reachable.
+    const def = world.rules.buildings.get(entity.type)!;
+    if (component >= 0 && !ringTiles(world, def, entity.tile).some(tile => world.nav.componentOf(tile) === component)) continue;
     // Expand on our own side of the map: closer to our start than to the enemy's.
     const enemy = enemyStart(t);
     if (enemy >= 0 && player.start >= 0) {
@@ -653,16 +659,32 @@ function waves(t: Think, snap: Snapshot): void {
     const hy = (((state.home / world.nav.width) | 0) + 0.5) * s;
     available.sort((a, b) => ((a.x - hx) ** 2 + (a.y - hy) ** 2) - ((b.x - hx) ** 2 + (b.y - hy) ** 2) || a.id - b.id);
   }
-  const chosen = available.slice(0, size);
+  // Mixed arms: take the nearest unit of each type in turn (types ordered by their nearest unit).
+  const byType = new Map<string, Entity[]>();
+  for (const unit of available) {
+    const list = byType.get(unit.type);
+    if (list) list.push(unit);
+    else byType.set(unit.type, [unit]);
+  }
+  // Commit a share of the surplus army when it outgrows the scheduled size (never above the maximum).
+  const committed = Math.min(knobs.waveMaxSize, Math.max(size, Math.floor((available.length - knobs.defenseReserve) * knobs.waveCommitPercent / 100)));
+  const chosen: Entity[] = [];
+  for (let round = 0; chosen.length < committed; round++) {
+    let added = false;
+    for (const list of byType.values()) {
+      if (round < list.length && chosen.length < committed) { chosen.push(list[round]); added = true; }
+    }
+    if (!added) break;
+  }
   const target = waveTarget(t, snap.hq.x, snap.hq.y);
   if (target < 0) return;
   const { x, y } = tileXY(world, target);
   if (!t.issue({ kind: 'amove', ids: chosen.map(u => u.id), x, y })) return;
   const composition: Record<string, number> = {};
   for (const unit of chosen) composition[unit.type] = (composition[unit.type] ?? 0) + 1;
-  state.waves.push({ index: state.waveIndex, launchTick: world.tick, size, composition, target, arrivedTick: -1 });
+  state.waves.push({ index: state.waveIndex, launchTick: world.tick, size: chosen.length, composition, target, arrivedTick: -1 });
   state.wave = chosen.map(u => u.id);
-  t.log(`wave ${state.waveIndex} launched: ${size} units → ${x},${y}`);
+  t.log(`wave ${state.waveIndex} launched: ${chosen.length} units → ${x},${y}`);
   state.waveIndex++;
   state.waveDelayed = false;
   state.nextWaveTick = world.tick + knobs.waveIntervalTicks;

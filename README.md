@@ -1,6 +1,6 @@
 # Steel Front
 
-WW2-themed, isometric browser RTS. **Current milestone: M6 — complete match and static delivery (all planned milestones done).** From the main menu, start a skirmish: pick Allies or Axis, The Lowlands or The Ardennes, and a Recruit / Regular / Veteran computer opponent. Deploy your MCV, build a base, and destroy the enemy HQ under fog of war; lose your HQ (or your MCV before it deploys) and you are defeated. Supply trucks and oil fund production, and combat uses data-driven weapons and armour. Matches can be saved to three browser slots and continued later.
+WW2-themed, isometric browser RTS. **Current milestone: M6 — complete match and static delivery (all planned milestones done).** From the main menu, start a skirmish: pick Allies or Axis, The Lowlands or The Ardennes, and a Recruit / Regular / Veteran computer opponent. Deploy your MCV, build a base, and destroy the enemy HQ under fog of war; lose your HQ (or your MCV before it deploys) and you are defeated. Supply trucks and oil fund production, and combat uses data-driven weapons and armour. Matches can be saved to three browser slots and continued later. Higher AI difficulties attack harder and also earn more (Recruit 75% income, Veteran 130%; see BALANCE.md).
 
 Requires Node.js 22.12+ (tested with Node 26) and npm.
 

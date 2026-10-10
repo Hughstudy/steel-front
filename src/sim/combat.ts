@@ -77,6 +77,18 @@ function maxRange(world: World, def: UnitDef): number {
   return range;
 }
 
+/** Whether every weapon that can hurt the target is blocked by its minimum range at this distance. */
+function inDeadZone(world: World, def: UnitDef, target: Entity, d2: number): boolean {
+  let blocked = false;
+  for (const id of def.weapons) {
+    const weapon = world.rules.weapons.get(id)!;
+    if (!canHit(world, weapon, target)) continue;
+    if (d2 >= weapon.minRange * weapon.minRange) return false;
+    blocked = true;
+  }
+  return blocked;
+}
+
 /** Whether any of the unit's weapons can engage the target at all. */
 function engageable(world: World, def: UnitDef, target: Entity): boolean {
   for (const id of def.weapons) if (canHit(world, world.rules.weapons.get(id)!, target)) return true;
@@ -134,6 +146,12 @@ function updateShooter(world: World, unit: Entity, def: UnitDef): void {
   if (unit.amove >= 0 && unit.attack < 0) attackMove(world, unit, def, air);
   // Explicit orders persist while the target is valid and visible.
   let target = validTarget(world, unit, def, unit.attack);
+  // An attack-move engagement that slipped inside minimum range is abandoned so the order can continue;
+  // explicit attacks instead reposition (see chase).
+  if (target && unit.amove >= 0 && !air && inDeadZone(world, def, target, (target.x - unit.x) ** 2 + (target.y - unit.y) ** 2)) {
+    target = null;
+    unit.aim = -1;
+  }
   if (!target && unit.attack >= 0) { unit.attack = -1; }
   if (target) unit.aim = target.id;
   else {
@@ -229,28 +247,49 @@ function sighted(world: World, unit: Entity, def: UnitDef): number {
   let bestRank = Infinity;
   world.grid.query(world, unit.x, unit.y, Math.max(maxRange(world, def), def.vision * s), (other, d2) => {
     if (!hostile(unit, other) || !canSee(world, unit.owner, other) || !engageable(world, def, other)) return;
+    if (def.movement !== 'air' && inDeadZone(world, def, other, d2)) return;
     const rank = (other.kind === 'unit' ? 0 : 1e15) + d2 * 1e5 + other.id;
     if (rank < bestRank) { bestRank = rank; best = other.id; }
   });
   return best;
 }
 
-/** Close to weapon range of an ordered target, re-routing as it moves; halt once in range. */
+/**
+ * Close to weapon range of an ordered target, re-routing as it moves; halt once in range.
+ * A target inside every usable weapon's minimum range makes the unit back off instead.
+ */
 function chase(world: World, unit: Entity, def: UnitDef, target: Entity, d2: number): void {
   let range = Infinity;
+  let inner = Infinity;
   for (const id of def.weapons) {
     const weapon = world.rules.weapons.get(id)!;
-    if (canHit(world, weapon, target)) range = Math.min(range, weapon.range);
+    if (!canHit(world, weapon, target)) continue;
+    range = Math.min(range, weapon.range);
+    inner = Math.min(inner, weapon.minRange);
   }
-  const inRange = d2 <= range * range * 0.85;
-  if (inRange) {
+  const tooClose = d2 < inner * inner;
+  if (!tooClose && d2 <= range * range * 0.85) {
     if (unit.goal >= 0 && unit.task === '') world.stopUnit(unit);
     return;
   }
   if (world.tick - unit.chaseTick < world.rules.combat.chaseRepathTicks && unit.goal >= 0) return;
   unit.chaseTick = world.tick;
   const s = world.subTile;
-  const tile = world.nav.index(Math.floor(target.x / s), Math.floor(target.y / s));
+  let px = target.x;
+  let py = target.y;
+  if (tooClose) {
+    // Aim for the middle of the firing band, directly away from the target.
+    let dx = unit.x - target.x;
+    let dy = unit.y - target.y;
+    if (dx === 0 && dy === 0) dx = 1;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    const want = (inner + Math.min(range, inner * 2)) / 2;
+    px = target.x + Math.round(dx * want / length);
+    py = target.y + Math.round(dy * want / length);
+  }
+  const tx = Math.max(0, Math.min(world.nav.width - 1, Math.floor(px / s)));
+  const ty = Math.max(0, Math.min(world.nav.height - 1, Math.floor(py / s)));
+  const tile = world.nav.index(tx, ty);
   const goal = world.nav.nearestInComponent(tile, world.nav.componentOf(unit.next >= 0 ? unit.next : unit.tile));
   if (goal >= 0 && goal !== unit.goal) {
     world.moveUnitTo(unit, goal);

@@ -1,8 +1,12 @@
 import type { EntityLayer } from '../render/entity-layer.ts';
-import { constructionProblem, deployOrigin } from '../sim/production.ts';
+import { constructionProblem, deployOrigin, inConstructionRange } from '../sim/production.ts';
 import type { ConstructionProblem } from '../sim/production.ts';
 import type { BuildingDef } from '../sim/rules.ts';
+import { footprintTiles } from '../sim/structures.ts';
 import type { World } from '../sim/world.ts';
+
+/** Placement problems as the player may know them; 'unexplored' never comes from live state. */
+export type PreviewProblem = ConstructionProblem | 'unexplored';
 
 export type HudMode = '' | 'place' | 'sell' | 'repair' | 'amove';
 
@@ -13,6 +17,7 @@ const PROBLEM_TEXT: Record<string, string> = {
   access: 'would block access',
   range: 'outside construction range',
   occupied: 'units will make way',
+  unexplored: 'unexplored ground',
 };
 
 export function problemText(problem: string): string { return PROBLEM_TEXT[problem] ?? problem; }
@@ -26,7 +31,7 @@ export class Placement {
   mode: HudMode = '';
   type = '';
   origin = -1;
-  problem: ConstructionProblem = '';
+  problem: PreviewProblem = '';
   private cacheKey = '';
 
   start(mode: HudMode, type = ''): void {
@@ -60,17 +65,18 @@ export class Placement {
       const w = world.nav.width;
       for (let dy = 0; dy < def.footprint.h; dy++) for (let dx = 0; dx < def.footprint.w; dx++) occupants += world.nav.occupancy[origin + dy * w + dx];
     }
-    const key = `${origin}|${world.nav.revision}|${occupants}`;
+    // Fog knowledge changes on its own interval, so the cache also expires with time when fog is on.
+    const key = `${origin}|${world.nav.revision}|${occupants}|${world.fogEnabled ? world.tick >> 2 : 0}`;
     if (key === this.cacheKey) return;
     this.cacheKey = key;
     this.origin = origin;
-    this.problem = origin < 0 ? 'bounds' : constructionProblem(world, player, def, origin);
+    this.problem = origin < 0 ? 'bounds' : previewProblem(world, player, def, origin);
   }
 
   draw(context: CanvasRenderingContext2D, world: World, layer: EntityLayer): void {
     if (this.mode !== 'place' || this.origin < 0) return;
     const def = world.rules.buildings.get(this.type)!;
-    drawFootprint(context, world, def, this.origin, this.problem === '' ? 'ok' : this.problem === 'occupied' ? 'warn' : 'bad');
+    drawFootprint(context, world, def, this.origin, this.problem === '' ? 'ok' : this.problem === 'occupied' ? 'warn' : 'bad', 0);
     const w = world.nav.width;
     const cx = (this.origin % w) + def.footprint.w / 2;
     const cy = ((this.origin / w) | 0) + def.footprint.h / 2;
@@ -81,8 +87,55 @@ export class Placement {
   }
 }
 
-/** Tile diamonds over a footprint: green valid, amber units in the way, red invalid. */
-export function drawFootprint(context: CanvasRenderingContext2D, world: World, def: BuildingDef, origin: number, state: 'ok' | 'warn' | 'bad'): void {
+/** Tiles covered by structures the player remembers (last-seen knowledge, not live state). */
+function rememberedTiles(world: World, player: number): Set<number> {
+  const tiles = new Set<number>();
+  const fog = world.players[player]?.fog;
+  if (!fog) return tiles;
+  const s = world.subTile;
+  const w = world.nav.width;
+  for (const record of fog.memory.values()) {
+    const def = world.rules.buildings.get(record.type);
+    if (!def) continue;
+    const ox = Math.round((record.x - (def.footprint.w * s >> 1)) / s);
+    const oy = Math.round((record.y - (def.footprint.h * s >> 1)) / s);
+    if (world.nav.inBounds(ox, oy)) for (const tile of footprintTiles(world, def, oy * w + ox)) tiles.add(tile);
+  }
+  return tiles;
+}
+
+/**
+ * The placement verdict using only what `player` knows. Fully visible sites get the
+ * authoritative live check; otherwise unexplored ground is refused and fogged tiles are
+ * judged by terrain and remembered structures. The place command re-validates in the
+ * simulation either way, so the preview never needs hidden live state.
+ */
+export function previewProblem(world: World, player: number, def: BuildingDef, origin: number): PreviewProblem {
+  const fog = world.fogEnabled ? world.players[player]?.fog : undefined;
+  const w = world.nav.width;
+  const ox = origin % w;
+  const oy = (origin / w) | 0;
+  if (ox < 1 || oy < 1 || ox + def.footprint.w > w - 1 || oy + def.footprint.h > world.nav.height - 1) return 'bounds';
+  const tiles = footprintTiles(world, def, origin);
+  if (!fog || tiles.every(tile => fog.visible[tile])) return constructionProblem(world, player, def, origin);
+  if (!inConstructionRange(world, player, def, origin)) return 'range';
+  if (tiles.some(tile => !fog.explored[tile])) return 'unexplored';
+  const remembered = rememberedTiles(world, player);
+  for (const tile of tiles) {
+    if (!world.buildable[tile]) return 'terrain';
+    if (fog.visible[tile] ? world.nav.structure[tile] !== 0 : remembered.has(tile)) return 'structure';
+  }
+  for (const tile of tiles) if (fog.visible[tile] && world.nav.occupancy[tile] !== 0) return 'occupied';
+  return '';
+}
+
+/**
+ * Tile diamonds over a footprint: green valid, amber units in the way, red invalid.
+ * With a `player`, per-tile blocking uses only that player's knowledge under fog.
+ */
+export function drawFootprint(context: CanvasRenderingContext2D, world: World, def: BuildingDef, origin: number, state: 'ok' | 'warn' | 'bad', player = -1): void {
+  const fog = player >= 0 && world.fogEnabled ? world.players[player]?.fog : undefined;
+  const remembered = fog ? rememberedTiles(world, player) : null;
   const w = world.nav.width;
   const ox = origin % w;
   const oy = (origin / w) | 0;
@@ -94,7 +147,9 @@ export function drawFootprint(context: CanvasRenderingContext2D, world: World, d
       const y = oy + dy;
       if (!world.nav.inBounds(x, y)) continue;
       const tile = y * w + x;
-      const blocked = !world.buildable[tile] || world.nav.structure[tile] !== 0;
+      let blocked: boolean;
+      if (!fog || fog.visible[tile]) blocked = !world.buildable[tile] || world.nav.structure[tile] !== 0;
+      else blocked = fog.explored[tile] === 1 && (!world.buildable[tile] || remembered!.has(tile));
       const px = (x - y) * 32;
       const py = (x + y) * 16;
       context.beginPath();

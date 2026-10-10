@@ -342,13 +342,19 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
     let kind: 'move' | 'nearest' | 'invalid' = 'invalid';
     if (nav.inBounds(x, y)) {
       // Read-only preview of how the simulation will resolve this target, for feedback.
-      const lead = world.get(ids[0]);
-      const component = lead ? nav.componentOf(lead.next >= 0 ? lead.next : lead.tile) : -1;
-      const resolved = component >= 0 ? nav.nearestInComponent(nav.index(x, y), component) : -1;
-      kind = resolved < 0 ? 'invalid' : resolved === nav.index(x, y) ? 'move' : 'nearest';
-      if (resolved >= 0) {
+      // Aircraft ignore ground navigation, so only a ground unit can make the order unreachable.
+      const tile = nav.index(x, y);
+      const groundLead = ids.map(id => world.get(id)).find(e => e && rules.units.get(e.type)?.movement === 'ground');
+      const component = groundLead ? nav.componentOf(groundLead.next >= 0 ? groundLead.next : groundLead.tile) : -1;
+      let resolved = !groundLead ? tile : component >= 0 ? nav.nearestInComponent(tile, component) : -1;
+      // Under fog the marker must not reveal hidden structures: unseen ground shows the clicked tile.
+      if (resolved >= 0 && world.fogEnabled && !world.players[PLAYER].fog.visible[tile]) resolved = tile;
+      kind = resolved < 0 ? 'invalid' : resolved === tile ? 'move' : 'nearest';
+      const flying = ids.some(id => { const e = world.get(id); return e !== undefined && rules.units.get(e.type)?.movement === 'air'; });
+      if (resolved >= 0 || flying) {
         world.enqueue({ player: PLAYER, kind: 'move', ids, x, y });
-        markers.add((resolved % nav.width) + 0.5, ((resolved / nav.width) | 0) + 0.5, kind, presentationTime);
+        const at = resolved >= 0 ? resolved : tile;
+        markers.add((at % nav.width) + 0.5, ((at / nav.width) | 0) + 0.5, resolved >= 0 ? kind : 'move', presentationTime);
         sfx.play('order');
         return;
       }
@@ -451,7 +457,15 @@ function updateCursor(hovered: Entity | null): void {
   else if (units.length > 0 && gameInput.pointerTile(hoverTile)) {
     const x = Math.floor(hoverTile.x);
     const y = Math.floor(hoverTile.y);
-    cursor = world.nav.inBounds(x, y) && world.nav.passable(world.nav.index(x, y)) ? 'cursor-move' : 'cursor-invalid';
+    // Only known ground is judged: live structures where visible, terrain where fogged, nothing where unexplored.
+    let open = false;
+    if (world.nav.inBounds(x, y)) {
+      const tile = world.nav.index(x, y);
+      const fog = world.fogEnabled ? world.players[PLAYER].fog : null;
+      const airOnly = units.every(id => rules.units.get(world.get(id)?.type ?? '')?.movement === 'air');
+      open = airOnly || (!fog || fog.visible[tile] ? world.nav.passable(tile) : !fog.explored[tile] || world.nav.terrainPassable[tile] === 1);
+    }
+    cursor = open ? 'cursor-move' : 'cursor-invalid';
   }
   for (const name of CURSORS) canvas.classList.toggle(name, cursor === name);
 }
@@ -463,7 +477,7 @@ function drawSelectionGuides(context: CanvasRenderingContext2D, hovered: Entity 
     if (typeof type === 'string') {
       const def = rules.buildings.get(type)!;
       const preview = deployPreview(world, hovered.id, hovered.next >= 0 ? hovered.next : hovered.tile, def);
-      if (preview.origin >= 0) drawFootprint(context, world, def, preview.origin, preview.problem === '' ? 'ok' : preview.problem === 'occupied' ? 'warn' : 'bad');
+      if (preview.origin >= 0) drawFootprint(context, world, def, preview.origin, preview.problem === '' ? 'ok' : preview.problem === 'occupied' ? 'warn' : 'bad', PLAYER);
     }
   }
   const w = world.nav.width;

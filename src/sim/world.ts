@@ -478,6 +478,8 @@ export class World {
           const cargo = this.rules.units.get(unit.type)!.capabilities.cargo;
           if (typeof cargo !== 'number') continue;
           cancelTask(this, unit);
+          // Replace any earlier route; a tile transition in progress still completes.
+          if (this.rules.units.get(unit.type)!.movement === 'ground') this.stopUnit(unit);
           unit.auto = true;
           unit.preferred = target ? target.id : -1;
           unit.task = depot || unit.cargo >= cargo ? 'seek-depot' : 'seek-dump';
@@ -491,6 +493,7 @@ export class World {
         for (const unit of units) {
           if (!this.rules.units.get(unit.type)!.capabilities.capture || target.owner === unit.owner) continue;
           cancelTask(this, unit);
+          if (this.rules.units.get(unit.type)!.movement === 'ground') this.stopUnit(unit);
           unit.task = 'capture';
           unit.target = target.id;
           unit.timer = 0;

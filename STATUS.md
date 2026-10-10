@@ -19,16 +19,39 @@ Completed 2026-10-10. The game opens on a main menu. New Skirmish lets you choos
 - **Subdirectory build** at `/games/steel-front/`: saved mid-battle, reloaded the page and loaded; 600 more ticks matched the uninterrupted fingerprint exactly. Preview had no console messages.
 - **Not done:** a fully hand-played match to victory, listening to the audio by ear, and long-session frame pacing on a defined laptop.
 
-## Next — review fixes
-Fix the seven P2 findings R1–R7 from the independent review below, with regressions.
+## Done — review fixes R1–R7 and balance pass
+Completed 2026-10-10, after the M6 checkpoint. All seven P2 findings from the independent review below are fixed, each with a regression test that failed before its fix (`tests/review.test.ts`).
+
+| Finding | Fix |
+|---|---|
+| R1 | Artillery dead-zone stalls |
+| R2 | Hidden-structure leaks in placement, cursor and markers |
+| R3 | Stale routes on capture and harvest orders |
+| R4 | Aircraft move gate |
+| R5 | Production keyboard focus |
+| R6 | Placement ordering hostile units |
+| R7 | AI oil capture after MCV relocation |
+
+- **Balance:** the Lowlands oil split was 1:3 against the west and is now 2:2.
+- **Difficulty:** now reliably ordered. New data knobs `incomePercent` (Recruit 75%, Veteran 130%) and `waveCommitPercent` give Veteran 8–0 vs Recruit, Veteran 8–0 vs Regular and Regular 7–1–0 vs Recruit in AI-vs-AI.
+- **Verification:**
+  - `npm test` 83/83, `npm run build` pass.
+  - R4 and R5 checked in the dev browser with real input.
+  - Production preview skirmish start with no console messages.
+- **Remaining limitations:**
+  - Spawn-sided mirror results per map.
+  - No fully hand-played match to victory.
+  - Audio not checked by ear.
+  - Long-session frame pacing on a target laptop not measured.
+- Details: `docs/verification/M6.md` → "Review fixes".
 
 ## Independent review — M0–M5
 
-Reviewed 2026-10-10 at committed M5 baseline `e67f5c0`, isolated from active M6 edits. The build and all 69 tests pass. M0–M5 systems are implemented, including the computer opponent, but seven reproduced P2 defects remain: artillery minimum-range stalling; hidden-structure preview leaks; resource/capture orders retaining old movement; aircraft move input over blocked ground; production keyboard focus loss; placement moving hostile units; and AI oil capture after MCV relocation.
+Reviewed 2026-10-10 at committed M5 baseline `e67f5c0`, isolated from active M6 edits. The build and all 69 tests pass. M0–M5 systems are implemented, including the computer opponent, but seven reproduced P2 defects remained (all fixed since; see above): artillery minimum-range stalling; hidden-structure preview leaks; resource/capture orders retaining old movement; aircraft move input over blocked ground; production keyboard focus loss; placement moving hostile units; and AI oil capture after MCV relocation.
 
 - Report, evidence, and reproduction instructions: `docs/verification/M0-M5-review.md`.
 - Independent checks also passed both-faction MCV-to-income bootstrap and a 200-unit opposing-traffic exercise.
-- Next: fix the review findings and add focused regressions alongside the ongoing M6 work. M6 completion and sustained target-machine 60 FPS are not certified by this review.
+- Next (at the time): fix the review findings and add focused regressions. Done after M6; see "review fixes" above. Sustained target-machine 60 FPS is still not certified.
 - This review changes documentation/evidence only; it does not alter runtime code or declare a new milestone complete.
 
 ## Done — M5: Skirmish AI

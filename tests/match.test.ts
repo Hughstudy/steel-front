@@ -111,9 +111,12 @@ test('a save continues exactly like the uninterrupted match (hauling, production
   const r = rules();
   const original = busyWorld();
   // Advance into the first battles, then stop at a tick with shots in flight and queued path jobs.
-  while (original.tick < 9 * MINUTE || original.projectiles.count === 0 || original.pathJobs.length === 0) {
+  const busy = (): boolean => original.projectiles.count > 0 && original.pathJobs.length > 0
+    && original.entities.some(e => e.cargo > 0 && e.task !== '')
+    && original.players.some(p => Object.values(p.queues).some(q => q.length && q[0].work > 0 && q[0].work < q[0].total));
+  while (original.tick < 9 * MINUTE || !busy()) {
     original.step();
-    assert.ok(original.tick < 16 * MINUTE, 'expected combat with queued path jobs');
+    assert.ok(original.tick < 16 * MINUTE, 'expected combat, hauling and production with queued path jobs');
   }
   const free = original.projectiles.freeSlots();
   assert.ok(free.length < original.projectiles.capacity);

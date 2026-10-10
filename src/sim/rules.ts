@@ -150,6 +150,10 @@ export interface AiDifficulty {
   thinkIntervalTicks: number; actionsPerThink: number; tempoPercent: number;
   truckTarget: number; engineerTarget: number; queueDepth: number; armyCap: number;
   firstWaveTick: number; waveIntervalTicks: number; waveStartSize: number; waveGrowth: number; waveMaxSize: number;
+  /** Share (0–100) of the army beyond the reserve committed to a wave when that exceeds the scheduled size. */
+  waveCommitPercent: number;
+  /** Income modifier (percent) applied to this computer player's deliveries and oil. */
+  incomePercent: number;
   defenseReserve: number; defenseRadius: number; defenseCalmTicks: number;
   powerMargin: number; placementTries: number; retryTicks: number; bankruptcyRetryTicks: number;
 }
@@ -587,7 +591,7 @@ export function loadRules(raw: RawRules): Rules {
       thinkIntervalTicks: int('thinkIntervalTicks', 1, 1000), actionsPerThink: int('actionsPerThink', 1, 100), tempoPercent: int('tempoPercent', 1, 1000),
       truckTarget: int('truckTarget', 0, 50), engineerTarget: int('engineerTarget', 0, 50), queueDepth: int('queueDepth', 1, 20), armyCap: int('armyCap', 0, 1000),
       firstWaveTick: int('firstWaveTick', 0, 1e7), waveIntervalTicks: int('waveIntervalTicks', 1, 1e7), waveStartSize: int('waveStartSize', 1, 500),
-      waveGrowth: int('waveGrowth', 0, 500), waveMaxSize: int('waveMaxSize', 1, 500),
+      waveGrowth: int('waveGrowth', 0, 500), waveMaxSize: int('waveMaxSize', 1, 500), waveCommitPercent: int('waveCommitPercent', 0, 100), incomePercent: int('incomePercent', 10, 1000),
       defenseReserve: int('defenseReserve', 0, 500), defenseRadius: int('defenseRadius', 1, 128), defenseCalmTicks: int('defenseCalmTicks', 1, 1e6),
       powerMargin: int('powerMargin', 0, 10000), placementTries: int('placementTries', 1, 10000), retryTicks: int('retryTicks', 1, 1e6),
       bankruptcyRetryTicks: int('bankruptcyRetryTicks', 1, 1e7),

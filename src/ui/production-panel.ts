@@ -45,13 +45,18 @@ export class ProductionPanel {
   private layoutKey = '';
   private cards = new Map<string, Card>();
   private noticeTick = -1;
+  /** A tab was clicked: keep keyboard focus in the panel even if the click did not focus it. */
+  private claimFocus = false;
 
   constructor(host: ProductionHost) {
     this.host = host;
     this.root.addEventListener('keydown', this.key);
     this.tabs.addEventListener('click', event => {
       const tab = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-category]');
-      if (tab?.dataset.category) this.select(tab.dataset.category);
+      if (tab?.dataset.category) {
+        this.select(tab.dataset.category);
+        this.claimFocus = true;
+      }
     });
     this.grid.addEventListener('click', event => {
       const card = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-type]');
@@ -112,6 +117,10 @@ export class ProductionPanel {
     const key = `${this.active}|${state.faction}|${producer}|${locks.join(';')}`;
     if (key !== this.layoutKey) {
       this.layoutKey = key;
+      // Rebuilding removes the focused button; remember it so the panel keeps its keyboard context.
+      const focused = document.activeElement instanceof HTMLElement && this.root.contains(document.activeElement) ? document.activeElement : null;
+      const keepFocus = focused !== null || this.claimFocus;
+      this.claimFocus = false;
       this.tabs.replaceChildren(...categories.map(category => {
         const tab = document.createElement('button');
         tab.dataset.category = category.id;
@@ -138,6 +147,12 @@ export class ProductionPanel {
         return button;
       }));
       if (items.length === 0) this.grid.textContent = 'Nothing to build here yet.';
+      if (keepFocus) {
+        const type = focused?.dataset.type;
+        const card = type ? this.cards.get(type)?.button : undefined;
+        const tab = [...this.tabs.children].find(t => (t as HTMLElement).dataset.category === this.active) as HTMLElement | undefined;
+        (card && !card.disabled ? card : tab)?.focus({ preventScroll: true });
+      }
     }
     // Per-frame values: queue counts, progress and pause reasons.
     const counts = new Map<string, number>();
