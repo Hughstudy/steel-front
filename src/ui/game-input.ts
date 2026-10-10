@@ -174,7 +174,7 @@ export class GameInput {
     if (this.selection.ids.size === 0) return;
     const tile = this.tileAtPointer();
     this.camera.screenToWorld(this.pointerX, this.pointerY, this.scratch);
-    const target = this.layer.pick(this.scratch.x, this.scratch.y, e => e.owner !== this.host.player() || !this.host.selectable(e));
+    const target = this.layer.pick(this.scratch.x, this.scratch.y, () => true);
     this.host.order(tile.x, tile.y, target, queue);
   }
 

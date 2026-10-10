@@ -1,5 +1,22 @@
 # Steel Front status
 
+## Done — M3: Base building
+Completed 2026-10-10. Default scenario "Forward Outpost": one MCV and 5000 credits. Deploy an HQ, then build a generator, barracks and motor pool from the production panel, produce trucks, infantry and vehicles, set rally points, and sell or repair. Everything is reachable through the HUD.
+
+- Data-driven tech tree, production categories and policies (`data/production.json`). Progressive payment, low power at 1/4 rate, exact refunds, shared placement validation with evacuation of units on the footprint.
+- Q/W/E production keyboard context that never pans the camera.
+- Details and evidence: `docs/verification/M3.md`.
+
+## Verification (M3)
+- `npm test`: 50/50 pass. `npm run build`: pass.
+- Browser dev: the full MCV → HQ → power → barracks → motor pool → truck → income loop, rally, sell and keyboard focus were done with real clicks and keys. Preview: invalid placement feedback, 200-unit benchmark, no console messages.
+- Not measured: real-time frame pacing (the pane was hidden).
+
+## Next — M4: Combat and fog
+Weapons, armor, projectiles, turrets, veterancy, fog of war, full roster, airfield, BALANCE.md.
+
+---
+
 ## Public repository — M2
 
 Prepared 2026-10-10 for `https://github.com/Hughstudy/steel-front` (public, `main`).
@@ -19,9 +36,6 @@ Completed 2026-10-10. Playable "Logistics Exercise" (default scenario): an HQ fi
 - `npm test`: 37/37 pass. `npm run build`: pass.
 - Browser dev and preview: capture and haul orders were issued with real clicks. A 5-minute untouched preview run produced 9200 credits, which equals the ledger exactly. No console messages.
 - Not measured: real-time frame pacing (the pane was hidden).
-
-## Next — M3: Base building
-MCV deploy → HQ; power plant, barracks, war factory; production queues; power; placement ghost; rally; sell/repair.
 
 ---
 

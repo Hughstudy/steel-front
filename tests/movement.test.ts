@@ -7,6 +7,7 @@ import { ids, scenarioWorld } from './helpers.ts';
 function assertOccupancy(world: World): void {
   const seen = new Set<number>();
   for (const unit of world.entities) {
+    if (unit.kind !== 'unit') continue;
     assert.equal(world.nav.occupancy[unit.tile], unit.id, `unit ${unit.id} does not hold its tile`);
     assert.ok(world.nav.passable(unit.tile), 'unit on blocked tile');
     assert.ok(!seen.has(unit.tile), 'two units share a tile');
@@ -24,7 +25,7 @@ function settle(world: World, bound: number): number {
   for (let t = 1; t <= bound; t++) {
     world.step();
     if (t % 10 === 0) assertOccupancy(world);
-    if (world.entities.every(e => e.moveState === MoveState.Arrived || e.moveState === MoveState.Idle || e.moveState === MoveState.Unreachable)) return t;
+    if (world.entities.every(e => e.kind !== 'unit' || e.moveState === MoveState.Arrived || e.moveState === MoveState.Idle || e.moveState === MoveState.Unreachable)) return t;
   }
   const stuck = world.entities.filter(e => e.moveState !== MoveState.Arrived).map(e => `${e.id}:${e.moveState}:${e.reason}`);
   assert.fail(`not settled within ${bound} ticks: ${stuck.join(' ')}`);
@@ -121,4 +122,18 @@ test('commands for other players or unknown entities are ignored', () => {
   world.enqueue({ player: 0, kind: 'move', ids: [9999], x: 95, y: 60 });
   for (let i = 0; i < 40; i++) world.step();
   assert.deepEqual(world.entities.map(e => e.tile), before);
+});
+
+test('the 20-unit crossing still settles with player buildings placed near the route', () => {
+  const world = scenarioWorld('m1-maneuvers');
+  // A small base on the west bank between the units and the bridges.
+  for (const [type, x, y] of [['allied_hq', 44, 54], ['allied_power', 46, 64], ['allied_barracks', 50, 58], ['allied_factory', 42, 68]] as Array<[string, number, number]>) {
+    world.placeBuildingNear(world.rules.buildings.get(type)!, 0, x, y);
+  }
+  const all = ids(world);
+  for (const [x, y] of [[95, 60], [38, 60]]) {
+    world.enqueue({ player: 0, kind: 'move', ids: all, x, y });
+    settle(world, bound(60));
+    for (const unit of world.entities) if (unit.kind === 'unit') assert.equal(unit.moveState, MoveState.Arrived, `unit ${unit.id} ${unit.reason}`);
+  }
 });

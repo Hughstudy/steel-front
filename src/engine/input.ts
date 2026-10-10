@@ -65,6 +65,8 @@ export class CameraInput {
   private keyDown = (event: KeyboardEvent): void => {
     if (event.ctrlKey || event.metaKey || event.altKey || document.querySelector('dialog[open]')) return;
     if (event.target instanceof HTMLElement && /INPUT|TEXTAREA|SELECT/.test(event.target.tagName)) return;
+    // A focused production panel owns its keys (Q/W/E/R, digits); never pan from them.
+    if (event.target instanceof HTMLElement && event.target.closest('[data-input-context]')) return;
     if (['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowLeft','ArrowDown','ArrowRight','ShiftLeft','ShiftRight'].includes(event.code)) {
       event.preventDefault();
       this.keys.add(event.code);
@@ -78,6 +80,9 @@ export class CameraInput {
   };
 
   private keyUp = (event: KeyboardEvent): void => { this.keys.delete(event.code); };
+
+  /** Forget held keys, e.g. when keyboard focus moves into another input context. */
+  releaseKeys(): void { this.keys.clear(); }
   private clear = (): void => {
     this.keys.clear();
     this.pointerUp();

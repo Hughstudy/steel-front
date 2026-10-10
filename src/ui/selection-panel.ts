@@ -22,6 +22,7 @@ export const TASK_TEXT: Record<string, string> = {
   load: 'loading supplies',
   unload: 'unloading',
   capture: 'capture order',
+  deploy: 'deploying',
 };
 
 export const STATUS_TEXT: Record<string, string> = {
@@ -32,6 +33,9 @@ export const STATUS_TEXT: Record<string, string> = {
   approaching: 'moving to capture',
   'already captured': 'target already captured',
   'no-route': 'no route to target',
+  'deploy-blocked': 'cannot deploy here — move to open buildable ground',
+  deploying: 'deploying',
+  'making way': 'making way for construction',
 };
 
 function maxHp(world: World, entity: Entity): number {
@@ -48,6 +52,9 @@ export function describe(world: World, entity: Entity): string {
     const def = world.rules.buildings.get(entity.type)!;
     const owner = entity.owner < 0 ? 'NEUTRAL' : `PLAYER ${entity.owner + 1}`;
     const parts = [owner];
+    if (def.power !== 0 && entity.owner >= 0) parts.push(`POWER ${def.power > 0 ? '+' : ''}${def.power}`);
+    if (entity.repairing) parts.push('REPAIRING');
+    if (entity.rally >= 0) parts.push('RALLY SET');
     if (typeof def.capabilities.supply === 'number') parts.push(`${entity.stock} / ${def.capabilities.supply} supplies`);
     if (def.capabilities.oil) parts.push(entity.owner < 0 ? 'engineer can capture' : `+${world.rules.economy.oilPayout} every ${world.rules.economy.oilIntervalTicks / world.rules.game.ticksPerSecond}s`);
     if (def.dockSlots > 0) parts.push(`docks ${entity.docks?.length ?? 0}/${def.dockSlots}`);

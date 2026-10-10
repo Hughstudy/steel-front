@@ -77,7 +77,26 @@ export interface BuildingDef {
   id: string; faction: string; name: string; cost: number; hp: number;
   footprint: { w: number; h: number }; buildTicks: number; prerequisites: string[];
   producer: string | null; power: number; vision: number; dockSlots: number; sellable: boolean;
+  /** Production categories this building serves as a producer for. */
+  produces: string[];
+  /** Exit tile offset from the footprint origin for produced units (must touch the footprint). */
+  exit: { x: number; y: number } | null;
   capabilities: BuildingCapabilities; visual: UnitVisual;
+}
+
+export interface ProductionCategory { id: string; name: string; hotkey: string; placement: boolean }
+export interface ProductionRules {
+  categories: ProductionCategory[];
+  queueLimit: number;
+  /** Work rate while power demand exceeds supply, as a fraction of full rate. */
+  lowPowerRate: { numerator: number; denominator: number };
+  cancelRefundPercent: number; sellRefundPercent: number;
+  repairIntervalTicks: number; repairStepPermille: number; repairCostPercent: number;
+  /** Tiles (Chebyshev) from any owned faction building in which new structures may be placed. */
+  constructionRadius: number;
+  placementTimeoutTicks: number;
+  /** Default distance produced units drive out from the exit when no rally point is set. */
+  rallyOffset: number;
 }
 
 export interface EconomyRules {
@@ -99,13 +118,14 @@ export interface Rules {
   units: Map<string, UnitDef>;
   buildings: Map<string, BuildingDef>;
   economy: EconomyRules;
+  production: ProductionRules;
   maps: Map<string, MapPreset>;
   scenarios: Map<string, ScenarioDef>;
 }
 
 export interface RawRules {
   game: unknown; terrain: unknown; factions: unknown; units: unknown; scenarios: unknown;
-  buildings: unknown; economy: unknown; maps: unknown;
+  buildings: unknown; economy: unknown; maps: unknown; production: unknown;
 }
 
 /** Owner faction id used for neutral map objects. */
@@ -173,6 +193,20 @@ export class RulesError extends Error {
 function layers(check: Checker, value: unknown, where: string): Record<MovementLayer, boolean> {
   const record = check.object(value, where);
   return { ground: check.bool(record, 'ground', where), air: check.bool(record, 'air', where) };
+}
+
+function exitOf(check: Checker, value: unknown, where: string, w: number, h: number): { x: number; y: number } | null {
+  if (value === null || value === undefined) return null;
+  const list = check.array(value, where);
+  const x = list[0];
+  const y = list[1];
+  if (list.length !== 2 || typeof x !== 'number' || typeof y !== 'number' || !Number.isInteger(x) || !Number.isInteger(y)) {
+    check.errors.push(`${where}: expected [dx, dy] integers`);
+    return null;
+  }
+  const inside = x >= 0 && x < w && y >= 0 && y < h;
+  if (inside || x < -1 || x > w || y < -1 || y > h) check.errors.push(`${where}: exit must be a tile touching the footprint`);
+  return { x, y };
 }
 
 function visualOf(check: Checker, record: Record<string, unknown>, where: string): UnitVisual {
@@ -271,6 +305,8 @@ export function loadRules(raw: RawRules): Rules {
       producer: r.producer === null ? null : check.string(r, 'producer', where),
       power: check.number(r, 'power', where, -1000, 1000, true), vision: check.number(r, 'vision', where, 0, 20, true),
       dockSlots: check.number(r, 'dockSlots', where, 0, 8, true), sellable: check.bool(r, 'sellable', where),
+      produces: check.strings(r, 'produces', where),
+      exit: exitOf(check, r.exit, `${where}.exit`, Math.max(1, w), Math.max(1, h)),
       capabilities: check.object(r.capabilities, `${where}.capabilities`) as BuildingCapabilities,
       visual: visualOf(check, check.object(r.visual, `${where}.visual`), `${where}.visual`),
     };
@@ -283,6 +319,49 @@ export function loadRules(raw: RawRules): Rules {
   for (const unit of units.values()) {
     const cargo = unit.capabilities.cargo;
     if (cargo !== undefined && (typeof cargo !== 'number' || !Number.isInteger(cargo) || cargo <= 0)) check.errors.push(`units[${unit.id}].capabilities.cargo: expected a positive integer`);
+  }
+
+  const pr = check.object(raw.production, 'production');
+  const rate = check.object(pr.lowPowerRate, 'production.lowPowerRate');
+  const production: ProductionRules = {
+    categories: check.array(pr.categories, 'production.categories').map((item, index) => {
+      const where = `production.categories[${index}]`;
+      const r = check.object(item, where);
+      return { id: check.string(r, 'id', where), name: check.string(r, 'name', where), hotkey: check.string(r, 'hotkey', where), placement: check.bool(r, 'placement', where) };
+    }),
+    queueLimit: check.number(pr, 'queueLimit', 'production', 1, 20, true),
+    lowPowerRate: {
+      numerator: check.number(rate, 'numerator', 'production.lowPowerRate', 1, 100, true),
+      denominator: check.number(rate, 'denominator', 'production.lowPowerRate', 1, 100, true),
+    },
+    cancelRefundPercent: check.number(pr, 'cancelRefundPercent', 'production', 0, 100, true),
+    sellRefundPercent: check.number(pr, 'sellRefundPercent', 'production', 0, 100, true),
+    repairIntervalTicks: check.number(pr, 'repairIntervalTicks', 'production', 1, 1000, true),
+    repairStepPermille: check.number(pr, 'repairStepPermille', 'production', 1, 1000, true),
+    repairCostPercent: check.number(pr, 'repairCostPercent', 'production', 0, 1000, true),
+    constructionRadius: check.number(pr, 'constructionRadius', 'production', 1, 64, true),
+    placementTimeoutTicks: check.number(pr, 'placementTimeoutTicks', 'production', 1, 10000, true),
+    rallyOffset: check.number(pr, 'rallyOffset', 'production', 1, 16, true),
+  };
+  if (production.lowPowerRate.numerator > production.lowPowerRate.denominator) check.errors.push('production.lowPowerRate: numerator must not exceed denominator');
+  const categoryIds = new Set(production.categories.map(c => c.id));
+  if (categoryIds.size !== production.categories.length) check.errors.push('production.categories: duplicate id');
+  const known = (id: string): boolean => units.has(id) || buildings.has(id);
+  for (const def of [...units.values(), ...buildings.values()]) {
+    const where = `${units.has(def.id) ? 'units' : 'buildings'}[${def.id}]`;
+    if (def.producer !== null && !categoryIds.has(def.producer)) check.errors.push(`${where}.producer: unknown production category ${def.producer}`);
+    for (const id of def.prerequisites) if (!known(id)) check.errors.push(`${where}.prerequisites: unknown id ${id}`);
+  }
+  for (const def of buildings.values()) {
+    for (const category of def.produces) if (!categoryIds.has(category)) check.errors.push(`buildings[${def.id}].produces: unknown category ${category}`);
+    const placement = production.categories.find(c => c.id === def.producer)?.placement;
+    if (def.producer !== null && !placement) check.errors.push(`buildings[${def.id}].producer: buildings must come from a placement category`);
+  }
+  for (const def of units.values()) {
+    const placement = production.categories.find(c => c.id === def.producer)?.placement;
+    if (def.producer !== null && placement) check.errors.push(`units[${def.id}].producer: units cannot come from a placement category`);
+    const deploy = def.capabilities.deploy;
+    if (deploy !== undefined && (typeof deploy !== 'string' || !buildings.has(deploy))) check.errors.push(`units[${def.id}].capabilities.deploy: unknown building ${String(deploy)}`);
   }
 
   const e = check.object(raw.economy, 'economy');
@@ -358,5 +437,5 @@ export function loadRules(raw: RawRules): Rules {
   });
 
   if (check.errors.length) throw new RulesError(check.errors);
-  return { game, terrain, factions, units, buildings, economy, maps, scenarios };
+  return { game, terrain, factions, units, buildings, economy, production, maps, scenarios };
 }

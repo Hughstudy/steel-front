@@ -52,8 +52,11 @@ function seek(world: World, truck: Entity, depot: boolean, capacity: number): vo
   if (truck.next >= 0) return; // decide on tile boundaries only
   const eco = world.rules.economy;
   if (!depot && truck.cargo >= capacity) { truck.task = 'seek-depot'; return; }
-  const field = world.fieldFrom(truck.tile);
-  const target = choose(world, truck, depot, field);
+  // Skip the route-cost field entirely when no candidate exists anywhere.
+  const valid = depot ? isDepot : isDump;
+  const any = world.entities.some(entity => valid(world, truck, entity));
+  const field = any ? world.fieldFrom(truck.tile) : null;
+  const target = field ? choose(world, truck, depot, field) : null;
   if (!target) {
     if (!depot && truck.cargo > 0) { truck.task = 'seek-depot'; return; }
     truck.status = depot ? 'no-depot' : 'no-resource';
@@ -62,7 +65,7 @@ function seek(world: World, truck: Entity, depot: boolean, capacity: number): vo
     return;
   }
   truck.target = target.id;
-  const tile = acquireDock(world, truck, target, field);
+  const tile = acquireDock(world, truck, target, field!);
   if (tile < 0) {
     truck.target = -1;
     truck.status = 'queued';

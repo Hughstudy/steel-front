@@ -75,6 +75,10 @@ export interface Entity {
   auto: boolean;
   /** Dock leases held at this building. */
   docks: DockLease[] | null;
+  /** Producer rally tile (-1 = drive straight out of the exit). */
+  rally: number;
+  /** Building is being repaired with credits. */
+  repairing: boolean;
 }
 
 export function createEntity(id: number, kind: EntityKind, type: string, owner: number, hp: number): Entity {
@@ -85,6 +89,6 @@ export function createEntity(id: number, kind: EntityKind, type: string, owner: 
     path: null, pathIndex: 0, goal: -1, orderId: 0,
     moveState: MoveState.Idle, reason: '', blocked: 0, waitTotal: 0, lastProgress: 0,
     yieldPath: null, yieldIndex: 0, yieldAvoid: null, resume: false, repath: 0, odometer: 0,
-    cargo: 0, stock: 0, task: '', target: -1, preferred: -1, timer: 0, status: '', auto: false, docks: null,
+    cargo: 0, stock: 0, task: '', target: -1, preferred: -1, timer: 0, status: '', auto: false, docks: null, rally: -1, repairing: false,
   };
 }

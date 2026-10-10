@@ -1,5 +1,33 @@
 [
   {
+    "id": "m3-outpost",
+    "name": "Forward Outpost",
+    "description": "One construction vehicle and 5000 credits. Deploy a headquarters, raise power, barracks and motor pool, and get supply trucks rolling.",
+    "map": "lowlands",
+    "camera": {
+      "x": 24,
+      "y": 50
+    },
+    "players": [
+      {
+        "faction": "allies",
+        "credits": 5000,
+        "anchor": {
+          "x": 24,
+          "y": 50
+        },
+        "units": [
+          {
+            "type": "allied_mcv",
+            "count": 1
+          }
+        ],
+        "buildings": []
+      }
+    ],
+    "resources": true
+  },
+  {
     "id": "m1-maneuvers",
     "name": "Maneuver Exercise",
     "description": "Twenty mixed units on the west bank. Select them and cross the river by either bridge.",

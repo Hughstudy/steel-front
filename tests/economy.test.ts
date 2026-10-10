@@ -155,3 +155,14 @@ test('identical runs give identical economy state', () => {
   assert.equal(snapshot(a), snapshot(b));
   assert.equal(JSON.stringify(a.players), JSON.stringify(b.players));
 });
+
+test('hauling keeps going with newly placed buildings crowding the depot', () => {
+  const world = scenarioWorld('m2-logistics');
+  const depot = hq(world);
+  const w = world.nav.width;
+  for (const type of ['allied_power', 'allied_barracks', 'allied_factory']) {
+    world.placeBuildingNear(world.rules.buildings.get(type)!, 0, (depot.tile % w) + 4, ((depot.tile / w) | 0) + 1);
+  }
+  run(world, 3000, x => assert.equal(x.players[0].credits, x.players[0].ledger.initial + x.players[0].ledger.delivered + x.players[0].ledger.oil));
+  assert.ok(world.players[0].ledger.delivered >= 2000, `delivered ${world.players[0].ledger.delivered}`);
+});

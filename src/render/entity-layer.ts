@@ -1,5 +1,6 @@
 import type { Entity } from '../sim/entities.ts';
 import { angleDelta } from '../sim/angles.ts';
+import type { BuildingDef } from '../sim/rules.ts';
 import type { World } from '../sim/world.ts';
 import type { CameraView } from '../types.ts';
 import { bakeBuilding } from './building-atlas.ts';
@@ -61,8 +62,11 @@ export class EntityLayer implements DepthLayer {
 
   buildingFor(world: World, entity: Entity): BuildingSprite {
     const def = world.rules.buildings.get(entity.type)!;
-    const faction = this.factionOf(world, entity, def.faction);
-    const key = `${entity.type}|${faction}`;
+    return this.buildingSprite(world, def, this.factionOf(world, entity, def.faction));
+  }
+
+  buildingSprite(world: World, def: BuildingDef, faction: string): BuildingSprite {
+    const key = `${def.id}|${faction}`;
     let sprite = this.buildings.get(key);
     if (!sprite) {
       sprite = bakeBuilding(def, world.rules.factions.get(faction) ?? null);
@@ -76,6 +80,14 @@ export class EntityLayer implements DepthLayer {
     for (const entity of world.entities) {
       if (entity.kind === 'unit') this.spritesFor(world, entity);
       else this.buildingFor(world, entity);
+    }
+    // Everything the players could produce, so construction never bakes mid-frame.
+    for (const player of world.players) {
+      for (const def of world.rules.buildings.values()) if (def.faction === player.faction) this.buildingSprite(world, def, player.faction);
+      for (const def of world.rules.units.values()) {
+        if (def.faction !== player.faction || this.sprites.has(`${def.id}|${player.faction}`)) continue;
+        this.sprites.set(`${def.id}|${player.faction}`, bakeUnit(def.visual, world.rules.factions.get(player.faction)!));
+      }
     }
   }
 

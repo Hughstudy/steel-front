@@ -1,0 +1,35 @@
+{
+  "categories": [
+    {
+      "id": "structure",
+      "name": "Structures",
+      "hotkey": "KeyQ",
+      "placement": true
+    },
+    {
+      "id": "infantry",
+      "name": "Infantry",
+      "hotkey": "KeyW",
+      "placement": false
+    },
+    {
+      "id": "vehicle",
+      "name": "Vehicles",
+      "hotkey": "KeyE",
+      "placement": false
+    }
+  ],
+  "queueLimit": 5,
+  "lowPowerRate": {
+    "numerator": 1,
+    "denominator": 4
+  },
+  "cancelRefundPercent": 100,
+  "sellRefundPercent": 50,
+  "repairIntervalTicks": 10,
+  "repairStepPermille": 10,
+  "repairCostPercent": 50,
+  "constructionRadius": 7,
+  "placementTimeoutTicks": 200,
+  "rallyOffset": 3
+}

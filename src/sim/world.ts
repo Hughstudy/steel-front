@@ -11,13 +11,21 @@ import { Pathfinder, UNREACHED } from './pathfinder.ts';
 import type { BuildingDef, Rules, ScenarioDef } from './rules.ts';
 import { findPlacement, footprintTiles } from './structures.ts';
 import { updateEconomy, releaseDock, cancelTask } from './economy.ts';
+import { cancelItem, deployUnit, enqueueItem, placeItem, sellBuilding, setRally, updatePower, updateProduction } from './production.ts';
+import type { PendingPlacement, QueueItem } from './production.ts';
 
 export interface Player {
   index: number;
   faction: string;
   credits: number;
-  /** Audit trail: every credit that entered or left this player's account. */
-  ledger: { delivered: number; oil: number; spent: number; refunded: number };
+  /** Audit trail: credits = initial + delivered + oil + refunded + sold − spent. */
+  ledger: { initial: number; delivered: number; oil: number; spent: number; refunded: number; sold: number };
+  /** Production queues by category id; only the head item of each queue works. */
+  queues: Record<string, QueueItem[]>;
+  power: { supply: number; demand: number };
+  /** Last rejected action, for HUD feedback. */
+  notice: string;
+  noticeTick: number;
 }
 
 export interface PathJob {
@@ -53,6 +61,9 @@ export class World {
   nextId = 1;
   /** Entities to remove at the end of the current tick, resolved in id order. */
   readonly removals: number[] = [];
+  /** Structures waiting for their footprint to clear (MCV deploys and queue placements). */
+  readonly pending: PendingPlacement[] = [];
+  nextItem = 1;
   commandSeq = 0;
   readonly commands: Command[] = [];
   readonly pathJobs: PathJob[] = [];
@@ -93,7 +104,11 @@ export class World {
   }
 
   addPlayer(faction: string, credits: number): Player {
-    const player = { index: this.players.length, faction, credits, ledger: { delivered: 0, oil: 0, spent: 0, refunded: 0 } };
+    const player: Player = {
+      index: this.players.length, faction, credits,
+      ledger: { initial: credits, delivered: 0, oil: 0, spent: 0, refunded: 0, sold: 0 },
+      queues: {}, power: { supply: 0, demand: 0 }, notice: '', noticeTick: 0,
+    };
     this.players.push(player);
     return player;
   }
@@ -128,6 +143,7 @@ export class World {
     this.nav.setStructure(footprintTiles(this, def, origin), entity.id);
     this.entities.push(entity);
     this.byId.set(entity.id, entity);
+    if (owner >= 0 && this.players[owner]) updatePower(this);
     return entity;
   }
 
@@ -163,6 +179,7 @@ export class World {
     for (const entity of this.entities) if (this.byId.has(entity.id)) this.entities[write++] = entity;
     this.entities.length = write;
     this.removals.length = 0;
+    updatePower(this);
   }
 
   /** Place scenario forces on free tiles in breadth-first order around each anchor. */
@@ -242,6 +259,7 @@ export class World {
       if (def.movement === 'ground') updateGroundUnit(this, entity, def);
     }
     updateEconomy(this);
+    updateProduction(this);
     this.flushRemovals();
   }
 
@@ -272,7 +290,33 @@ export class World {
   private execute(command: Command): void {
     const units = this.ownedUnits(command);
     const target = command.target !== undefined ? this.byId.get(command.target) : undefined;
+    const ownedBuilding = target && target.kind === 'building' && target.owner === command.player ? target : undefined;
     switch (command.kind) {
+      case 'build':
+        if (command.type) enqueueItem(this, command.player, command.type);
+        return;
+      case 'cancel':
+        if (command.type) cancelItem(this, command.player, command.type);
+        return;
+      case 'place':
+        if (command.type) placeItem(this, command.player, command.type, command.x, command.y);
+        return;
+      case 'deploy':
+        for (const unit of units) {
+          if (typeof this.rules.units.get(unit.type)!.capabilities.deploy !== 'string') continue;
+          cancelTask(this, unit);
+          deployUnit(this, unit);
+        }
+        return;
+      case 'sell':
+        if (ownedBuilding) sellBuilding(this, command.player, ownedBuilding);
+        return;
+      case 'repair':
+        if (ownedBuilding) ownedBuilding.repairing = !ownedBuilding.repairing && ownedBuilding.hp < this.rules.buildings.get(ownedBuilding.type)!.hp;
+        return;
+      case 'rally':
+        if (ownedBuilding) setRally(this, command.player, ownedBuilding, command.x, command.y);
+        return;
       case 'stop':
         for (const unit of units) { cancelTask(this, unit); this.stopUnit(unit); }
         return;
