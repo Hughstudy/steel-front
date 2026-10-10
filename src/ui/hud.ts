@@ -112,5 +112,5 @@ export class Hud {
     if (trunk) trunk.style.opacity = id === 1 ? '1' : '0';
   }
 
-  renderMinimap(view: CameraView, dots: MinimapDots | null = null): void { this.minimap.render(view, dots); }
+  renderMinimap(view: CameraView, dots: MinimapDots | null = null, shroud: HTMLCanvasElement | null = null): void { this.minimap.render(view, dots, shroud); }
 }

@@ -21,6 +21,7 @@ export function rawRules(): Record<string, unknown> {
     game: readJson('game'), terrain: readJson('terrain'), factions: readJson('factions'),
     units: readJson('units'), scenarios: readJson('scenarios'),
     buildings: readJson('buildings'), economy: readJson('economy'), maps: readJson('maps'), production: readJson('production'),
+    weapons: readJson('weapons'), combat: readJson('combat'),
   };
 }
 
@@ -39,5 +40,10 @@ export function ids(world: World, owner = 0): number[] {
 
 /** Authoritative snapshot excluding memo caches. */
 export function snapshot(world: World): string {
-  return JSON.stringify({ tick: world.tick, entities: world.entities, jobs: world.pathJobs, occupancy: Array.from(world.nav.occupancy) });
+  const pool = world.projectiles;
+  return JSON.stringify({
+    tick: world.tick, entities: world.entities, jobs: world.pathJobs, occupancy: Array.from(world.nav.occupancy),
+    projectiles: [Array.from(pool.active), Array.from(pool.x), Array.from(pool.y), Array.from(pool.target)],
+    players: world.players.map(p => ({ credits: p.credits, ledger: p.ledger, queues: p.queues, visible: Array.from(p.fog.visible).join('') })),
+  });
 }

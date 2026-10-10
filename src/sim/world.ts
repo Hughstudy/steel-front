@@ -13,6 +13,13 @@ import { findPlacement, footprintTiles } from './structures.ts';
 import { updateEconomy, releaseDock, cancelTask } from './economy.ts';
 import { cancelItem, deployUnit, enqueueItem, placeItem, sellBuilding, setRally, updatePower, updateProduction } from './production.ts';
 import type { PendingPlacement, QueueItem } from './production.ts';
+import { updateCombat } from './combat.ts';
+import { updateAirUnit } from './air.ts';
+import { createFog, updateFog, canSee } from './fog.ts';
+import type { PlayerFog } from './fog.ts';
+import { ProjectilePool } from './projectiles.ts';
+import { SpatialGrid } from './spatial.ts';
+import type { WeaponDef } from './rules.ts';
 
 export interface Player {
   index: number;
@@ -26,7 +33,11 @@ export interface Player {
   /** Last rejected action, for HUD feedback. */
   notice: string;
   noticeTick: number;
+  fog: PlayerFog;
 }
+
+/** Cosmetic event for presentation (muzzle flash, impact, death); cleared every tick, never read by the simulation. */
+export interface WorldEvent { kind: 'fire' | 'impact' | 'death' | 'promote'; x: number; y: number; a: number; weapon: string; id: number }
 
 export interface PathJob {
   entity: number;
@@ -64,6 +75,18 @@ export class World {
   /** Structures waiting for their footprint to clear (MCV deploys and queue placements). */
   readonly pending: PendingPlacement[] = [];
   nextItem = 1;
+  readonly grid: SpatialGrid;
+  readonly projectiles: ProjectilePool;
+  /** Weapons in data order; projectiles store an index into this list. */
+  readonly weaponList: WeaponDef[];
+  readonly weaponIndex = new Map<string, number>();
+  /** Entities reduced to 0 HP this tick, resolved in id order. */
+  readonly deaths: number[] = [];
+  readonly events: WorldEvent[] = [];
+  /** Fog of war (scenario flag); when off every player sees everything. */
+  fogEnabled = true;
+  /** Increments whenever fog masks are recomputed (presentation cache key). */
+  fogVersion = 0;
   commandSeq = 0;
   readonly commands: Command[] = [];
   readonly pathJobs: PathJob[] = [];
@@ -80,6 +103,10 @@ export class World {
     this.search = new LocalSearch(this.nav.size);
     this.random = new Random(seed);
     this.buildable = new Uint8Array(this.nav.size);
+    this.grid = new SpatialGrid(this.nav.width, this.nav.height);
+    this.projectiles = new ProjectilePool(rules.combat.projectilePool);
+    this.weaponList = Array.from(rules.weapons.values());
+    this.weaponList.forEach((weapon, index) => this.weaponIndex.set(weapon.id, index));
     const propBuildable = new Uint8Array(256).fill(1);
     for (const prop of rules.terrain.props) propBuildable[prop.index] = prop.buildable ? 1 : 0;
     for (let i = 0; i < this.nav.size; i++) {
@@ -107,7 +134,7 @@ export class World {
     const player: Player = {
       index: this.players.length, faction, credits,
       ledger: { initial: credits, delivered: 0, oil: 0, spent: 0, refunded: 0, sold: 0 },
-      queues: {}, power: { supply: 0, demand: 0 }, notice: '', noticeTick: 0,
+      queues: {}, power: { supply: 0, demand: 0 }, notice: '', noticeTick: 0, fog: createFog(this.nav.size),
     };
     this.players.push(player);
     return player;
@@ -123,6 +150,7 @@ export class World {
     entity.x = entity.prevX = (tile % this.nav.width) * s + (s >> 1);
     entity.y = entity.prevY = ((tile / this.nav.width) | 0) * s + (s >> 1);
     if (def.movement === 'ground') this.nav.occupancy[tile] = entity.id;
+    else entity.goal = tile;
     this.entities.push(entity);
     this.byId.set(entity.id, entity);
     return entity;
@@ -185,6 +213,7 @@ export class World {
   /** Place scenario forces on free tiles in breadth-first order around each anchor. */
   loadScenario(scenario: ScenarioDef): void {
     const preset = this.rules.maps.get(scenario.map)!;
+    this.fogEnabled = scenario.fog;
     if (scenario.resources) {
       const dump = this.rules.buildings.get(preset.supplyType)!;
       const derrick = this.rules.buildings.get(preset.derrickType)!;
@@ -217,6 +246,7 @@ export class World {
         }
       }
     }
+    updateFog(this, true);
   }
 
   enqueue(input: CommandInput, tick = this.tick + 1): Command {
@@ -245,6 +275,7 @@ export class World {
 
   step(): void {
     this.tick++;
+    this.events.length = 0;
     for (const entity of this.entities) {
       entity.prevX = entity.x;
       entity.prevY = entity.y;
@@ -254,10 +285,13 @@ export class World {
     this.executeCommands();
     this.processPathJobs();
     for (const entity of this.entities) {
-      if (entity.kind !== 'unit') continue;
+      if (entity.kind !== 'unit' || entity.hp <= 0) continue;
       const def = this.rules.units.get(entity.type)!;
       if (def.movement === 'ground') updateGroundUnit(this, entity, def);
+      else updateAirUnit(this, entity, def);
     }
+    updateFog(this);
+    updateCombat(this);
     updateEconomy(this);
     updateProduction(this);
     this.flushRemovals();
@@ -318,14 +352,33 @@ export class World {
         if (ownedBuilding) setRally(this, command.player, ownedBuilding, command.x, command.y);
         return;
       case 'stop':
-        for (const unit of units) { cancelTask(this, unit); this.stopUnit(unit); }
+        for (const unit of units) {
+          cancelTask(this, unit);
+          unit.attack = unit.aim = -1;
+          if (this.rules.units.get(unit.type)!.movement === 'air') unit.goal = unit.tile;
+          else this.stopUnit(unit);
+        }
         return;
       case 'move': {
         if (!this.nav.inBounds(command.x, command.y)) return;
+        for (const unit of units) { unit.attack = -1; unit.aim = -1; }
         const ground = units.filter(unit => this.rules.units.get(unit.type)!.movement === 'ground');
         // A manual move suspends autonomous hauling/capture until explicitly resumed.
         for (const unit of ground) cancelTask(this, unit);
         this.orderMove(ground, this.nav.index(command.x, command.y));
+        for (const unit of units) if (this.rules.units.get(unit.type)!.movement === 'air') { unit.goal = this.nav.index(command.x, command.y); unit.target = -1; }
+        return;
+      }
+      case 'attack': {
+        // Only targets the commanding player can currently see may be ordered.
+        if (!target || target.hp <= 0 || target.owner === command.player || target.owner < 0 || !canSee(this, command.player, target)) return;
+        for (const unit of units) {
+          if (this.rules.units.get(unit.type)!.weapons.length === 0) continue;
+          cancelTask(this, unit);
+          unit.attack = target.id;
+          unit.aim = target.id;
+          unit.chaseTick = -1000000;
+        }
         return;
       }
       case 'harvest':

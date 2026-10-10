@@ -37,7 +37,12 @@ export interface UnitDef {
   id: string; faction: string; name: string; cost: number; hp: number;
   /** Tiles per second as authored. */
   speed: number;
-  movement: MovementLayer; armor: string; vision: number; buildTicks: number;
+  movement: MovementLayer; armor: string;
+  /** Effective armour thickness (mm-like) that AP penetration is compared against; 0 = unarmoured. */
+  armorValue: number;
+  /** Byte-angle units per tick for the turret (turreted units). */
+  turretTurnRate: number;
+  vision: number; buildTicks: number;
   prerequisites: string[]; producer: string | null;
   /** Byte-angle units (256 per turn) per tick. */
   turnRate: number;
@@ -57,6 +62,8 @@ export interface ScenarioDef {
   camera: { x: number; y: number }; players: ScenarioPlayer[];
   /** Place the map preset's supply dumps and oil derricks. */
   resources: boolean;
+  /** Fog of war and shroud (default on). */
+  fog: boolean;
 }
 
 export interface BuildingCapabilities {
@@ -119,6 +126,8 @@ export interface Rules {
   buildings: Map<string, BuildingDef>;
   economy: EconomyRules;
   production: ProductionRules;
+  weapons: Map<string, WeaponDef>;
+  combat: CombatRules;
   maps: Map<string, MapPreset>;
   scenarios: Map<string, ScenarioDef>;
 }
@@ -126,12 +135,53 @@ export interface Rules {
 export interface RawRules {
   game: unknown; terrain: unknown; factions: unknown; units: unknown; scenarios: unknown;
   buildings: unknown; economy: unknown; maps: unknown; production: unknown;
+  weapons: unknown; combat: unknown;
 }
 
 /** Owner faction id used for neutral map objects. */
 export const NEUTRAL = 'neutral';
 
-export const ARMOR_CLASSES = ['infantry', 'light', 'heavy', 'building'];
+/** Armor classes the engine itself relies on; data may add more (e.g. towed guns). */
+export const ARMOR_CLASSES = ['building'];
+export const DAMAGE_TYPES = ['small', 'he', 'ap'] as const;
+export type DamageType = typeof DAMAGE_TYPES[number];
+export const PROJECTILE_KINDS = ['bullet', 'shell', 'arc'] as const;
+
+export interface WeaponDef {
+  id: string; name: string; damageType: DamageType; damage: number;
+  /** AP only: compared with target armorValue; ≥ armour gives full damage. */
+  penetration: number;
+  /** Fixed-point (subTile units). */
+  range: number; minRange: number;
+  reloadTicks: number;
+  projectile: typeof PROJECTILE_KINDS[number];
+  /** Fixed-point units per tick. */
+  projectileSpeed: number;
+  /** Fixed-point radius; 0 = single target. */
+  splashRadius: number;
+  /** Percent damage lost at the splash edge (linear falloff from the centre). */
+  splashFalloff: number;
+  targets: MovementLayer[];
+  /** Byte-angle tolerance between barrel/body heading and target bearing. */
+  aimTolerance: number;
+  /** Fires in any direction (squads, pintle mounts) without turning. */
+  freeAim: boolean;
+  /** Ticks stationary before the weapon may fire (towed guns). */
+  setupTicks: number;
+  fireWhileMoving: boolean;
+}
+
+export interface CombatRules {
+  /** Percent damage by armour class and damage type. */
+  armorClasses: Record<string, Record<DamageType, number>>;
+  minPenetrationPercent: number;
+  veterancy: { thresholdsPercent: number[]; damagePercent: number[]; reloadPercent: number[]; armorPercent: number[] };
+  projectilePool: number;
+  acquireIntervalTicks: number;
+  fogIntervalTicks: number;
+  chaseRepathTicks: number;
+  air: { holdRadius: number; overshootTiles: number; altitude: number };
+}
 
 class Checker {
   errors: string[] = [];
@@ -273,7 +323,9 @@ export function loadRules(raw: RawRules): Rules {
     const def: UnitDef = {
       id: check.string(r, 'id', where), faction: check.string(r, 'faction', where), name: check.string(r, 'name', where),
       cost: check.number(r, 'cost', where, 0, 100000, true), hp: check.number(r, 'hp', where, 1, 100000, true), speed,
-      movement: check.oneOf(r, 'movement', where, MOVEMENT_LAYERS), armor: check.oneOf(r, 'armor', where, ARMOR_CLASSES),
+      movement: check.oneOf(r, 'movement', where, MOVEMENT_LAYERS), armor: check.string(r, 'armor', where),
+      armorValue: check.number(r, 'armorValue', where, 0, 1000, true),
+      turretTurnRate: r.turretTurnRate === undefined ? 0 : check.number(r, 'turretTurnRate', where, 1, 128, true),
       vision: check.number(r, 'vision', where, 1, 20, true), buildTicks: check.number(r, 'buildTicks', where, 1, 100000, true),
       prerequisites: check.strings(r, 'prerequisites', where),
       producer: r.producer === null ? null : check.string(r, 'producer', where),
@@ -282,6 +334,7 @@ export function loadRules(raw: RawRules): Rules {
       capabilities: check.object(r.capabilities, `${where}.capabilities`) as UnitCapabilities,
       speedPerTick: Math.max(1, Math.round(speed * game.subTile / game.ticksPerSecond)),
     };
+    if (def.turretTurnRate === 0) def.turretTurnRate = Math.min(128, def.turnRate * 2);
     if (units.has(def.id)) check.errors.push(`${where}: duplicate unit id ${def.id}`);
     if (!factions.has(def.faction)) check.errors.push(`${where}.faction: unknown faction ${def.faction}`);
     units.set(def.id, def);
@@ -364,6 +417,74 @@ export function loadRules(raw: RawRules): Rules {
     if (deploy !== undefined && (typeof deploy !== 'string' || !buildings.has(deploy))) check.errors.push(`units[${def.id}].capabilities.deploy: unknown building ${String(deploy)}`);
   }
 
+  const sub = game.subTile;
+  const tps = game.ticksPerSecond;
+  const weapons = new Map<string, WeaponDef>();
+  check.array(raw.weapons, 'weapons').forEach((item, index) => {
+    const r = check.object(item, `weapons[${index}]`);
+    const where = `weapons[${typeof r.id === 'string' ? r.id : index}]`;
+    const targets = check.strings(r, 'targets', where);
+    for (const layer of targets) if (!MOVEMENT_LAYERS.includes(layer as MovementLayer)) check.errors.push(`${where}.targets: unknown layer ${layer}`);
+    const def: WeaponDef = {
+      id: check.string(r, 'id', where), name: check.string(r, 'name', where),
+      damageType: check.oneOf(r, 'damageType', where, DAMAGE_TYPES),
+      damage: check.number(r, 'damage', where, 1, 100000, true),
+      penetration: check.number(r, 'penetration', where, 0, 1000, true),
+      range: Math.round(check.number(r, 'range', where, 0.5, 40) * sub),
+      minRange: Math.round(check.number(r, 'minRange', where, 0, 40) * sub),
+      reloadTicks: check.number(r, 'reloadTicks', where, 1, 10000, true),
+      projectile: check.oneOf(r, 'projectile', where, PROJECTILE_KINDS),
+      projectileSpeed: Math.max(1, Math.round(check.number(r, 'projectileSpeed', where, 1, 200) * sub / tps)),
+      splashRadius: Math.round(check.number(r, 'splashRadius', where, 0, 10) * sub),
+      splashFalloff: check.number(r, 'splashFalloff', where, 0, 100, true),
+      targets: targets as MovementLayer[],
+      aimTolerance: check.number(r, 'aimTolerance', where, 0, 128, true),
+      freeAim: check.bool(r, 'freeAim', where), setupTicks: check.number(r, 'setupTicks', where, 0, 10000, true),
+      fireWhileMoving: check.bool(r, 'fireWhileMoving', where),
+    };
+    if (def.minRange >= def.range) check.errors.push(`${where}: minRange must be below range`);
+    if (weapons.has(def.id)) check.errors.push(`${where}: duplicate weapon id ${def.id}`);
+    weapons.set(def.id, def);
+  });
+  for (const unit of units.values()) for (const id of unit.weapons) if (!weapons.has(id)) check.errors.push(`units[${unit.id}].weapons: unknown weapon ${id}`);
+
+  const c = check.object(raw.combat, 'combat');
+  const classes = check.object(c.armorClasses, 'combat.armorClasses');
+  const armorClasses: Record<string, Record<DamageType, number>> = {};
+  for (const name of new Set([...ARMOR_CLASSES, ...Object.keys(classes)])) {
+    const row = check.object(classes[name], `combat.armorClasses.${name}`);
+    armorClasses[name] = { small: 0, he: 0, ap: 0 };
+    for (const type of DAMAGE_TYPES) armorClasses[name][type] = check.number(row, type, `combat.armorClasses.${name}`, 0, 1000, true);
+  }
+  for (const unit of units.values()) if (!armorClasses[unit.armor]) check.errors.push(`units[${unit.id}].armor: unknown armor class ${unit.armor}`);
+  const vet = check.object(c.veterancy, 'combat.veterancy');
+  const percents = (key: string): number[] => {
+    const list = check.array(vet[key], `combat.veterancy.${key}`);
+    return list.map((value, i) => {
+      if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > 1000) check.errors.push(`combat.veterancy.${key}[${i}]: expected an integer percent`);
+      return typeof value === 'number' ? value : 0;
+    });
+  };
+  const air = check.object(c.air, 'combat.air');
+  const combat: CombatRules = {
+    armorClasses,
+    minPenetrationPercent: check.number(c, 'minPenetrationPercent', 'combat', 0, 100, true),
+    veterancy: { thresholdsPercent: percents('thresholdsPercent'), damagePercent: percents('damagePercent'), reloadPercent: percents('reloadPercent'), armorPercent: percents('armorPercent') },
+    projectilePool: check.number(c, 'projectilePool', 'combat', 1, 65536, true),
+    acquireIntervalTicks: check.number(c, 'acquireIntervalTicks', 'combat', 1, 100, true),
+    fogIntervalTicks: check.number(c, 'fogIntervalTicks', 'combat', 1, 100, true),
+    chaseRepathTicks: check.number(c, 'chaseRepathTicks', 'combat', 1, 1000, true),
+    air: {
+      holdRadius: check.number(air, 'holdRadius', 'combat.air', 1, 20, true),
+      overshootTiles: check.number(air, 'overshootTiles', 'combat.air', 1, 20, true),
+      altitude: check.number(air, 'altitude', 'combat.air', 0, 200, true),
+    },
+  };
+  const levels = combat.veterancy.thresholdsPercent.length + 1;
+  for (const key of ['damagePercent', 'reloadPercent', 'armorPercent'] as const) {
+    if (combat.veterancy[key].length !== levels) check.errors.push(`combat.veterancy.${key}: expected ${levels} entries (one per rank)`);
+  }
+
   const e = check.object(raw.economy, 'economy');
   const economy: EconomyRules = {
     loadPerTick: check.number(e, 'loadPerTick', 'economy', 1, 10000, true),
@@ -403,7 +524,7 @@ export function loadRules(raw: RawRules): Rules {
     const camera = check.object(r.camera, `${where}.camera`);
     const def: ScenarioDef = {
       id: check.string(r, 'id', where), name: check.string(r, 'name', where), description: check.string(r, 'description', where),
-      map: check.string(r, 'map', where), resources: r.resources === true,
+      map: check.string(r, 'map', where), resources: r.resources === true, fog: r.fog !== false,
       camera: { x: check.number(camera, 'x', `${where}.camera`, 0, 1023), y: check.number(camera, 'y', `${where}.camera`, 0, 1023) },
       players: check.array(r.players, `${where}.players`).map((p, pi) => {
         const pw = `${where}.players[${pi}]`;
@@ -437,5 +558,5 @@ export function loadRules(raw: RawRules): Rules {
   });
 
   if (check.errors.length) throw new RulesError(check.errors);
-  return { game, terrain, factions, units, buildings, economy, production, maps, scenarios };
+  return { game, terrain, factions, units, buildings, economy, production, weapons, combat, maps, scenarios };
 }

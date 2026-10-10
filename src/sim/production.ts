@@ -284,6 +284,13 @@ export function exitTile(world: World, building: Entity): number {
 
 function spawnProduced(world: World, player: number, item: QueueItem): boolean {
   for (const producer of producersFor(world, player, item.category)) {
+    if (world.rules.units.get(item.type)!.movement === 'air') {
+      // Aircraft take off from the producer and hold over it (or its rally point).
+      const s = world.subTile;
+      const unit = world.spawnUnit(item.type, player, world.nav.index(Math.floor(producer.x / s), Math.floor(producer.y / s)));
+      if (producer.rally >= 0) unit.goal = producer.rally;
+      return true;
+    }
     const tile = exitTile(world, producer);
     if (tile < 0) continue;
     const def = world.rules.units.get(item.type)!;

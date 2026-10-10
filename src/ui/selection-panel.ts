@@ -51,6 +51,8 @@ export function describe(world: World, entity: Entity): string {
   if (entity.kind === 'building') {
     const def = world.rules.buildings.get(entity.type)!;
     const owner = entity.owner < 0 ? 'NEUTRAL' : `PLAYER ${entity.owner + 1}`;
+    // Fog memory ghosts (negative ids) carry no live information.
+    if (entity.id < 0) return `${owner} · LAST SEEN`;
     const parts = [owner];
     if (def.power !== 0 && entity.owner >= 0) parts.push(`POWER ${def.power > 0 ? '+' : ''}${def.power}`);
     if (entity.repairing) parts.push('REPAIRING');
@@ -62,10 +64,13 @@ export function describe(world: World, entity: Entity): string {
   }
   const def = world.rules.units.get(entity.type)!;
   const parts: string[] = [];
+  if (entity.rank > 0) parts.push(entity.rank > 1 ? 'ELITE' : 'VETERAN');
   const cargo = def.capabilities.cargo;
   if (typeof cargo === 'number') parts.push(`CARGO ${entity.cargo}/${cargo}`);
   if (entity.task === 'capture' && entity.timer > 0) {
     parts.push(`CAPTURING ${Math.round(100 * entity.timer / world.rules.economy.captureTicks)}%`);
+  } else if (entity.attack >= 0) {
+    parts.push('ATTACKING');
   } else if (entity.task && TASK_TEXT[entity.task]) {
     parts.push(`${entity.auto ? 'AUTO · ' : ''}${TASK_TEXT[entity.task]}`);
   } else {

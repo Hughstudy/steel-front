@@ -17,6 +17,12 @@
       "name": "Vehicles",
       "hotkey": "KeyE",
       "placement": false
+    },
+    {
+      "id": "aircraft",
+      "name": "Aircraft",
+      "hotkey": "KeyR",
+      "placement": false
     }
   ],
   "queueLimit": 5,

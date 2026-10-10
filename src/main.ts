@@ -8,6 +8,8 @@ import buildingData from '../data/buildings.json';
 import economyData from '../data/economy.json';
 import mapPresetData from '../data/maps.json';
 import productionData from '../data/production.json';
+import weaponData from '../data/weapons.json';
+import combatData from '../data/combat.json';
 import type { MapConfig } from './types.ts';
 import { Camera } from './engine/camera.ts';
 import { CameraInput } from './engine/input.ts';
@@ -15,10 +17,14 @@ import { GameLoop } from './engine/loop.ts';
 import { generateTerrain } from './sim/terrain.ts';
 import { loadRules } from './sim/rules.ts';
 import { World } from './sim/world.ts';
+import { createEntity } from './sim/entities.ts';
 import type { Entity } from './sim/entities.ts';
+import { canSee } from './sim/fog.ts';
 import { TerrainRenderer } from './render/terrain-renderer.ts';
 import { EntityLayer } from './render/entity-layer.ts';
 import { OrderMarkers } from './render/markers.ts';
+import { FogLayer } from './render/fog-layer.ts';
+import { Effects } from './render/effects.ts';
 import { Hud } from './ui/hud.ts';
 import type { MinimapDots } from './ui/minimap.ts';
 import { Selection } from './ui/selection.ts';
@@ -33,6 +39,7 @@ const config: MapConfig = mapData;
 const rules = loadRules({
   game: gameData, terrain: terrainData, factions: factionData, units: unitData, scenarios: scenarioData,
   buildings: buildingData, economy: economyData, maps: mapPresetData, production: productionData,
+  weapons: weaponData, combat: combatData,
 });
 const canvas = document.querySelector<HTMLCanvasElement>('#battlefield')!;
 const viewport = document.querySelector<HTMLElement>('#viewport')!;
@@ -41,13 +48,16 @@ const camera = new Camera(map.width, map.height);
 const renderer = new TerrainRenderer(canvas, map, config);
 const layer = new EntityLayer();
 const markers = new OrderMarkers();
+const fogLayer = new FogLayer(map.width, map.height);
+const effects = new Effects();
 const placement = new Placement();
 const scenarioSelect = document.querySelector<HTMLSelectElement>('#scenario-select')!;
 const selection = new Selection();
 const PLAYER = 0;
 let world = new World(rules, map, config.seed);
-let scenarioId = 'm3-outpost';
-let inspected = 0;
+let scenarioId = 'm4-combat';
+/** Entity shown in the panel when nothing is selected (live entity id or a memory ghost). */
+let inspected: Entity | null = null;
 let showGrid = false;
 let presentationTime = 0;
 const stats = { fps: 60, frameMs: 0, tick: 0, visibleChunks: 0, grid: false };
@@ -58,8 +68,10 @@ function startScenario(id: string): void {
   world = new World(rules, map, config.seed);
   world.loadScenario(scenario);
   layer.warm(world);
+  fogLayer.reset();
+  ghosts.clear();
   selection.clear();
-  inspected = 0;
+  inspected = null;
   placement.cancel();
   camera.reset(scenario.camera.x, scenario.camera.y);
   scenarioSelect.value = id;
@@ -81,6 +93,41 @@ const hud = new Hud(map, config, {
 });
 const panel = new SelectionPanel(type => selection.set(selection.list().filter(id => world.get(id)?.type === type)));
 const cameraInput = new CameraInput(canvas, camera, (x, y) => hud.inspect(x, y), reset, toggleGrid);
+
+/** Whether the local player sees a tile now (effects and projectiles are filtered by it). */
+function tileVisible(tx: number, ty: number): boolean {
+  if (!world.fogEnabled) return true;
+  const x = Math.floor(tx);
+  const y = Math.floor(ty);
+  if (!world.nav.inBounds(x, y)) return false;
+  return world.players[PLAYER].fog.visible[world.nav.index(x, y)] === 1;
+}
+const seen = (entity: Entity): boolean => canSee(world, PLAYER, entity);
+
+/**
+ * Remembered enemy/neutral structures under fog, drawn as last seen. Ghosts use
+ * negative ids so nothing can look up the live entity's health or activity.
+ */
+const ghosts = new Map<number, Entity>();
+const ghostList: Entity[] = [];
+function refreshGhosts(): void {
+  ghostList.length = 0;
+  if (!world.fogEnabled) return;
+  const memory = world.players[PLAYER].fog.memory;
+  for (const [id, ghost] of ghosts) if (!memory.has(-ghost.id - 1) || ghost.type !== memory.get(-ghost.id - 1)!.type) ghosts.delete(id);
+  for (const record of memory.values()) {
+    const live = world.get(record.id);
+    if (live && seen(live)) continue;
+    let ghost = ghosts.get(record.id);
+    if (!ghost || ghost.owner !== record.owner) {
+      ghost = createEntity(-record.id - 1, 'building', record.type, record.owner, rules.buildings.get(record.type)!.hp);
+      ghost.x = ghost.prevX = record.x;
+      ghost.y = ghost.prevY = record.y;
+      ghosts.set(record.id, ghost);
+    }
+    ghostList.push(ghost);
+  }
+}
 
 function stopSelected(): void {
   const ids = selection.list();
@@ -105,7 +152,7 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
   player: () => PLAYER,
   world: () => world,
   selectable: (entity: Entity) => entity.owner === PLAYER,
-  inspect: entity => { inspected = entity ? entity.id : 0; },
+  inspect: entity => { inspected = entity && (entity.id < 0 || seen(entity)) ? entity : null; },
   primaryAction: (tileX, tileY) => {
     if (placement.mode === 'place') {
       const def = rules.buildings.get(placement.type)!;
@@ -153,10 +200,11 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
       deploySelected();
       return;
     }
-    const context = contextOrder(world, PLAYER, ids, target);
+    // Unseen or remembered targets take a plain move order (no hidden information).
+    const context = contextOrder(world, PLAYER, ids, target && target.id > 0 && seen(target) ? target : null);
     if (context !== 'move' && target) {
       world.enqueue({ player: PLAYER, kind: context, ids, x, y, target: target.id });
-      markers.add(target.x / world.subTile, target.y / world.subTile, context === 'capture' ? 'attack' : 'rally', presentationTime);
+      markers.add(target.x / world.subTile, target.y / world.subTile, context === 'capture' || context === 'attack' ? 'attack' : 'rally', presentationTime);
       return;
     }
     let kind: 'move' | 'nearest' | 'invalid' = 'invalid';
@@ -238,8 +286,9 @@ hud.inspect(config.spawn.x, config.spawn.y);
 const dots: MinimapDots = { count: 0, x: new Float32Array(4096), y: new Float32Array(4096), color: [] };
 function fillDots(): void {
   let n = 0;
-  for (const entity of world.entities) {
+  for (const source of [world.entities, ghostList]) for (const entity of source) {
     if (n >= dots.x.length) break;
+    if (source === world.entities && !seen(entity)) continue;
     dots.x[n] = entity.x / world.subTile;
     dots.y[n] = entity.y / world.subTile;
     dots.color[n] = selection.ids.has(entity.id) ? '#ffffff' : entity.owner === PLAYER ? '#d8f08a' : entity.owner < 0 ? '#c9b98a' : '#ef6b52';
@@ -250,11 +299,12 @@ function fillDots(): void {
 
 const funds = document.getElementById('funds')!;
 const hoverTile = { x: 0, y: 0 };
-const CURSORS = ['cursor-select', 'cursor-move', 'cursor-invalid', 'cursor-harvest', 'cursor-capture', 'cursor-place', 'cursor-sell', 'cursor-repair', 'cursor-deploy'];
+const CURSORS = ['cursor-select', 'cursor-move', 'cursor-invalid', 'cursor-harvest', 'cursor-capture', 'cursor-place', 'cursor-sell', 'cursor-repair', 'cursor-deploy', 'cursor-attack'];
 function updateCursor(hovered: Entity | null): void {
   let cursor = '';
   const units = selectedUnits();
-  const context = units.length > 0 ? contextOrder(world, PLAYER, units, hovered) : 'move';
+  const target = hovered && hovered.id > 0 && seen(hovered) ? hovered : null;
+  const context = units.length > 0 ? contextOrder(world, PLAYER, units, target) : 'move';
   const ownBuilding = hovered && hovered.kind === 'building' && hovered.owner === PLAYER ? rules.buildings.get(hovered.type)! : null;
   if (placement.mode === 'place') cursor = 'cursor-place';
   else if (placement.mode === 'sell') cursor = ownBuilding?.sellable ? 'cursor-sell' : 'cursor-invalid';
@@ -262,6 +312,7 @@ function updateCursor(hovered: Entity | null): void {
   else if (hovered && selection.ids.has(hovered.id) && typeof rules.units.get(hovered.type)?.capabilities.deploy === 'string') cursor = 'cursor-deploy';
   else if (context === 'harvest' || context === 'deposit') cursor = 'cursor-harvest';
   else if (context === 'capture') cursor = 'cursor-capture';
+  else if (context === 'attack') cursor = 'cursor-attack';
   else if (hovered && hovered.owner === PLAYER) cursor = 'cursor-select';
   else if (units.length > 0 && gameInput.pointerTile(hoverTile)) {
     const x = Math.floor(hoverTile.x);
@@ -327,9 +378,15 @@ let lastPanel = 0;
 let frames = 0;
 let renderDuration = 0;
 let simDuration = 0;
+/** One authoritative tick, then hand its events to the cosmetic effects. */
+function tick(): void {
+  world.step();
+  effects.consume(world, world.events, tileVisible);
+}
+
 function simulate(): void {
   const started = performance.now();
-  world.step();
+  tick();
   simDuration += performance.now() - started;
 }
 
@@ -339,10 +396,16 @@ function renderFrame(alpha: number, dt: number): void {
   cameraInput.update(dt);
   camera.update(dt);
   selection.prune(world, PLAYER);
+  effects.now = presentationTime;
+  fogLayer.update(world, PLAYER);
+  refreshGhosts();
   const hovered = gameInput.hovered();
-  layer.prepare(world, camera.view, alpha, { selected: selection.ids, hovered: hovered ? hovered.id : 0 });
+  layer.prepare(world, camera.view, alpha, { selected: selection.ids, hovered: hovered ? hovered.id : 0, visible: world.fogEnabled ? seen : null, ghosts: ghostList });
   renderer.render(camera.view, Math.max(0, world.tick - 1 + alpha) * loop.clock.step, showGrid, layer);
   const context = canvas.getContext('2d')!;
+  effects.drawProjectiles(context, world, world.projectiles, alpha, tileVisible);
+  effects.draw(context);
+  fogLayer.draw(context);
   if (placement.mode === 'place' && gameInput.pointerTile(hoverTile)) {
     placement.update(world, PLAYER, hoverTile.x, hoverTile.y);
     placement.draw(context, world, layer);
@@ -361,10 +424,12 @@ function renderFrame(alpha: number, dt: number): void {
     context.strokeRect(Math.min(x0, x1) + 0.5, Math.min(y0, y1) + 0.5, Math.abs(x1 - x0), Math.abs(y1 - y0));
   }
   fillDots();
-  hud.renderMinimap(camera.view, dots);
+  hud.renderMinimap(camera.view, dots, fogLayer.enabled ? fogLayer.canvas : null);
   updateCursor(hovered);
+  if (inspected && inspected.id > 0 && (!world.get(inspected.id) || !seen(inspected))) inspected = null;
+  if (inspected && inspected.id < 0 && !ghostList.includes(inspected)) inspected = null;
   if (started - lastPanel > 120) {
-    panel.update(world, selection, layer, inspected ? world.get(inspected) ?? null : null);
+    panel.update(world, selection, layer, inspected);
     updateHud();
     lastPanel = started;
   }
@@ -390,32 +455,32 @@ loop.start();
  * QA benchmark: renders `frames` frames synchronously while panning, advancing one
  * simulation tick every third frame (≈60 FPS cadence). Reports CPU time per frame.
  */
-function benchmark(frames = 600): Record<string, number> {
+function benchmark(frames = 600, pan = true): Record<string, number> {
   const samples: number[] = [];
   const simSamples: number[] = [];
   for (let i = 0; i < frames; i++) {
     const start = performance.now();
-    if (i % 3 === 0) { const s = performance.now(); world.step(); simSamples.push(performance.now() - s); }
-    camera.pan(Math.sin(i / 60) * 6, Math.cos(i / 80) * 3, true);
+    if (i % 3 === 0) { const s = performance.now(); tick(); simSamples.push(performance.now() - s); }
+    if (pan) camera.pan(Math.sin(i / 60) * 6, Math.cos(i / 80) * 3, true);
     renderFrame((i % 3) / 3, 1 / 60);
     samples.push(performance.now() - start);
   }
   samples.sort((a, b) => a - b);
   simSamples.sort((a, b) => a - b);
   const pick = (list: number[], q: number): number => Math.round(list[Math.min(list.length - 1, Math.floor(list.length * q))] * 100) / 100;
-  return { frames, units: world.entities.length, visible: layer.count, median: pick(samples, 0.5), p95: pick(samples, 0.95), max: pick(samples, 1), simMedian: pick(simSamples, 0.5), simMax: pick(simSamples, 1) };
+  return { frames, units: world.entities.length, visible: layer.count, projectiles: world.projectiles.count, peakProjectiles: world.projectiles.peak, median: pick(samples, 0.5), p95: pick(samples, 0.95), max: pick(samples, 1), simMedian: pick(simSamples, 0.5), simMax: pick(simSamples, 1) };
 }
 
 /** QA: advance the simulation synchronously (works while the tab is hidden) and redraw. */
 function advance(ticks: number): number {
-  for (let i = 0; i < ticks; i++) world.step();
+  for (let i = 0; i < ticks; i++) tick();
   lastPanel = 0;
   renderFrame(1, 0);
   return world.tick;
 }
 
 // Debug/QA hook for measuring in the browser without affecting the simulation.
-(window as unknown as { steelFront: unknown }).steelFront = { get world() { return world; }, camera, selection, layer, benchmark, startScenario, advance, placement,
+(window as unknown as { steelFront: unknown }).steelFront = { get world() { return world; }, camera, selection, layer, benchmark, startScenario, advance, placement, effects, fogLayer,
   render: () => { lastPanel = 0; renderFrame(1, 0); },
   /** Page coordinates of an entity's ground point, for driving real pointer input in QA. */
   screenOf: (id: number) => {

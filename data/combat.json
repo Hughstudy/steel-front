@@ -1,0 +1,65 @@
+{
+  "armorClasses": {
+    "infantry": {
+      "small": 100,
+      "he": 100,
+      "ap": 25
+    },
+    "light": {
+      "small": 25,
+      "he": 60,
+      "ap": 100
+    },
+    "heavy": {
+      "small": 4,
+      "he": 30,
+      "ap": 100
+    },
+    "building": {
+      "small": 8,
+      "he": 70,
+      "ap": 45
+    },
+    "aircraft": {
+      "small": 60,
+      "he": 0,
+      "ap": 60
+    },
+    "gun": {
+      "small": 50,
+      "he": 100,
+      "ap": 15
+    }
+  },
+  "minPenetrationPercent": 15,
+  "veterancy": {
+    "thresholdsPercent": [
+      100,
+      300
+    ],
+    "damagePercent": [
+      0,
+      10,
+      25
+    ],
+    "reloadPercent": [
+      0,
+      10,
+      20
+    ],
+    "armorPercent": [
+      0,
+      10,
+      25
+    ]
+  },
+  "projectilePool": 1024,
+  "acquireIntervalTicks": 6,
+  "fogIntervalTicks": 4,
+  "chaseRepathTicks": 30,
+  "air": {
+    "holdRadius": 3,
+    "overshootTiles": 3,
+    "altitude": 40
+  }
+}

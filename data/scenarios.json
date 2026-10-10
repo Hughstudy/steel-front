@@ -1,5 +1,171 @@
 [
   {
+    "id": "m4-combat",
+    "name": "Combat Sandbox",
+    "description": "Your battle group and base face an entrenched Axis force across the river. Use AT guns against armour, MGs against infantry, artillery from range and fighters for air cover.",
+    "map": "lowlands",
+    "camera": {
+      "x": 40,
+      "y": 58
+    },
+    "fog": true,
+    "resources": true,
+    "players": [
+      {
+        "faction": "allies",
+        "credits": 8000,
+        "anchor": {
+          "x": 40,
+          "y": 58
+        },
+        "buildings": [
+          {
+            "type": "allied_hq",
+            "spawn": 0
+          },
+          {
+            "type": "allied_power",
+            "spawn": 0
+          },
+          {
+            "type": "allied_power",
+            "spawn": 0
+          },
+          {
+            "type": "allied_barracks",
+            "spawn": 0
+          },
+          {
+            "type": "allied_factory",
+            "spawn": 0
+          },
+          {
+            "type": "allied_airfield",
+            "spawn": 0
+          }
+        ],
+        "units": [
+          {
+            "type": "allied_rifle",
+            "count": 6
+          },
+          {
+            "type": "allied_mg",
+            "count": 2
+          },
+          {
+            "type": "allied_sniper",
+            "count": 1
+          },
+          {
+            "type": "allied_engineer",
+            "count": 1
+          },
+          {
+            "type": "allied_halftrack",
+            "count": 1
+          },
+          {
+            "type": "allied_light_tank",
+            "count": 1
+          },
+          {
+            "type": "allied_medium_tank",
+            "count": 3
+          },
+          {
+            "type": "allied_heavy_tank",
+            "count": 1
+          },
+          {
+            "type": "allied_at_gun",
+            "count": 2
+          },
+          {
+            "type": "allied_artillery",
+            "count": 2
+          },
+          {
+            "type": "allied_truck",
+            "count": 2
+          },
+          {
+            "type": "allied_fighter",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "faction": "axis",
+        "credits": 8000,
+        "anchor": {
+          "x": 92,
+          "y": 64
+        },
+        "buildings": [
+          {
+            "type": "axis_hq",
+            "spawn": 1
+          },
+          {
+            "type": "axis_power",
+            "spawn": 1
+          },
+          {
+            "type": "axis_barracks",
+            "spawn": 1
+          },
+          {
+            "type": "axis_factory",
+            "spawn": 1
+          }
+        ],
+        "units": [
+          {
+            "type": "axis_rifle",
+            "count": 6
+          },
+          {
+            "type": "axis_mg",
+            "count": 2
+          },
+          {
+            "type": "axis_sniper",
+            "count": 1
+          },
+          {
+            "type": "axis_halftrack",
+            "count": 1
+          },
+          {
+            "type": "axis_light_tank",
+            "count": 1
+          },
+          {
+            "type": "axis_medium_tank",
+            "count": 2
+          },
+          {
+            "type": "axis_heavy_tank",
+            "count": 1
+          },
+          {
+            "type": "axis_at_gun",
+            "count": 2
+          },
+          {
+            "type": "axis_artillery",
+            "count": 1
+          },
+          {
+            "type": "axis_fighter",
+            "count": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
     "id": "m3-outpost",
     "name": "Forward Outpost",
     "description": "One construction vehicle and 5000 credits. Deploy a headquarters, raise power, barracks and motor pool, and get supply trucks rolling.",
@@ -103,7 +269,8 @@
         ]
       }
     ],
-    "resources": false
+    "resources": false,
+    "fog": false
   },
   {
     "id": "m2-logistics",
@@ -145,5 +312,111 @@
       }
     ],
     "resources": true
+  },
+  {
+    "id": "m4-stress",
+    "name": "Battle Stress (200)",
+    "description": "Two hundred mixed units in a pitched battle, for combat and projectile profiling.",
+    "map": "lowlands",
+    "camera": {
+      "x": 48,
+      "y": 60
+    },
+    "fog": true,
+    "resources": false,
+    "players": [
+      {
+        "faction": "allies",
+        "credits": 0,
+        "anchor": {
+          "x": 38,
+          "y": 60
+        },
+        "units": [
+          {
+            "type": "allied_rifle",
+            "count": 30
+          },
+          {
+            "type": "allied_mg",
+            "count": 10
+          },
+          {
+            "type": "allied_halftrack",
+            "count": 8
+          },
+          {
+            "type": "allied_light_tank",
+            "count": 10
+          },
+          {
+            "type": "allied_medium_tank",
+            "count": 15
+          },
+          {
+            "type": "allied_heavy_tank",
+            "count": 5
+          },
+          {
+            "type": "allied_at_gun",
+            "count": 8
+          },
+          {
+            "type": "allied_artillery",
+            "count": 6
+          },
+          {
+            "type": "allied_fighter",
+            "count": 8
+          }
+        ]
+      },
+      {
+        "faction": "axis",
+        "credits": 0,
+        "anchor": {
+          "x": 60,
+          "y": 62
+        },
+        "units": [
+          {
+            "type": "axis_rifle",
+            "count": 30
+          },
+          {
+            "type": "axis_mg",
+            "count": 10
+          },
+          {
+            "type": "axis_halftrack",
+            "count": 8
+          },
+          {
+            "type": "axis_light_tank",
+            "count": 10
+          },
+          {
+            "type": "axis_medium_tank",
+            "count": 15
+          },
+          {
+            "type": "axis_heavy_tank",
+            "count": 5
+          },
+          {
+            "type": "axis_at_gun",
+            "count": 8
+          },
+          {
+            "type": "axis_artillery",
+            "count": 6
+          },
+          {
+            "type": "axis_fighter",
+            "count": 8
+          }
+        ]
+      }
+    ]
   }
 ]

@@ -60,7 +60,7 @@ export class Minimap {
     });
   }
 
-  render(view: CameraView, dots: MinimapDots | null = null): void {
+  render(view: CameraView, dots: MinimapDots | null = null, shroud: HTMLCanvasElement | null = null): void {
     const ctx = this.context;
     const scale = this.scale;
     const ox = this.originX;
@@ -83,9 +83,16 @@ export class Minimap {
     ctx.lineWidth = 0.6;
     ctx.stroke();
     ctx.clip();
+    const hw = this.config.tileWidth / 2 * scale;
+    const hh = this.config.tileHeight / 2 * scale;
+    if (shroud) {
+      // One shroud pixel per tile, mapped through the same isometric projection.
+      ctx.save();
+      ctx.transform(hw, hh, -hw, hh, ox, oy);
+      ctx.drawImage(shroud, 0, 0);
+      ctx.restore();
+    }
     if (dots) {
-      const hw = this.config.tileWidth / 2 * scale;
-      const hh = this.config.tileHeight / 2 * scale;
       for (let i = 0; i < dots.count; i++) {
         ctx.fillStyle = dots.color[i];
         ctx.fillRect(ox + (dots.x[i] - dots.y[i]) * hw - 1.2, oy + (dots.x[i] + dots.y[i]) * hh - 1.2, 2.4, 2.4);

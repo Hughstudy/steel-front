@@ -7,3 +7,9 @@ System fonts are rendered from the player's device. Reference projects listed in
 `docs/m0-preview.jpg` is a screenshot of the project's own M0 production build, captured during local browser verification.
 
 `docs/m1-maneuvers.jpg` is a screenshot of the project's own M1 development build.
+
+Combat effects (muzzle flashes, tracers, shells, explosions, smoke), the fog-of-war shroud, aircraft sprites and the attack cursor (inline SVG) are also procedural and original.
+
+`docs/m2-logistics.jpg`, `docs/m3-base.jpg` and `docs/m4-combat.jpg` are screenshots of the project's own development builds.
+
+Combat balance *ratios* are inspired by Spring: 1944 (<https://github.com/spring1944/spring1944>, by the Spring: 1944 development team; data CC BY-NC 3.0, code GPL). No Spring: 1944 code, data tables, art or audio is included. See BALANCE.md.

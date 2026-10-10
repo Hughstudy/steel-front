@@ -79,6 +79,22 @@ export interface Entity {
   rally: number;
   /** Building is being repaired with credits. */
   repairing: boolean;
+  /** Combat: per-weapon cooldown ticks. */
+  cooldowns: number[];
+  /** Player-ordered attack target (-1 none) and the current engagement target (-1 none). */
+  attack: number;
+  aim: number;
+  /** Ticks spent stationary (towed guns need setup time before firing). */
+  setup: number;
+  /** Tick of the last chase re-route toward an attack target. */
+  chaseTick: number;
+  /** Kill value earned (credits of destroyed enemies) and veterancy rank (0 = rookie). */
+  xp: number;
+  rank: number;
+  /** Entity that dealt the lethal hit (-1 none); set exactly once. */
+  killer: number;
+  /** Most recent attacker, for retaliation (-1 none). */
+  attacker: number;
 }
 
 export function createEntity(id: number, kind: EntityKind, type: string, owner: number, hp: number): Entity {
@@ -90,5 +106,6 @@ export function createEntity(id: number, kind: EntityKind, type: string, owner: 
     moveState: MoveState.Idle, reason: '', blocked: 0, waitTotal: 0, lastProgress: 0,
     yieldPath: null, yieldIndex: 0, yieldAvoid: null, resume: false, repath: 0, odometer: 0,
     cargo: 0, stock: 0, task: '', target: -1, preferred: -1, timer: 0, status: '', auto: false, docks: null, rally: -1, repairing: false,
+    cooldowns: [], attack: -1, aim: -1, setup: 0, chaseTick: 0, xp: 0, rank: 0, killer: -1, attacker: -1,
   };
 }

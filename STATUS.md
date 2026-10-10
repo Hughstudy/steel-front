@@ -1,5 +1,25 @@
 # Steel Front status
 
+## Done — M4: Combat and fog
+Completed 2026-10-10. The default scenario "Combat Sandbox" gives each side a base and a mixed army on opposite banks. "Battle Stress (200)" is a 100 v 100 profiling battle.
+
+- Data-driven weapons, armour classes, penetration, projectiles, splash, setup, turrets, veterancy, and a full roster including towed guns, howitzers and fighters (Airfield).
+- Deterministic fog of war with explored memory. One visibility rule covers the view, minimap, panel, orders and effects. Remembered structures appear as ghosts with no live information.
+- Right-click attack with a crosshair cursor, effects and projectile rendering, rank chevrons, and aircraft at altitude.
+- Balance anchored on Spring: 1944 ratios (CC BY-NC data, used as ratios only): see `BALANCE.md`.
+- Details and evidence: `docs/verification/M4.md`.
+
+## Verification (M4)
+- `npm test`: 60/60 pass. `npm run build`: pass.
+- Browser dev: real drag-select, right-click move and right-click attack (all 19 armed units targeted the clicked squad). The battle shows effects, promotions, fog and minimap shroud.
+- Preview: 200-unit battle benchmark. Frame CPU median 0.2 ms, p95 1.5 ms, max 5.6 ms. Sim tick max 5.5 ms; projectile peak 20. No console messages.
+- Not measured: long-session real-time frame pacing.
+
+## Next — M5: AI
+Computer opponent driven by `data/ai.json`, with difficulty knobs: build order, economy, army composition, attack waves, defence. It must respect fog.
+
+---
+
 ## Done — M3: Base building
 Completed 2026-10-10. Default scenario "Forward Outpost": one MCV and 5000 credits. Deploy an HQ, then build a generator, barracks and motor pool from the production panel, produce trucks, infantry and vehicles, set rally points, and sell or repair. Everything is reachable through the HUD.
 
@@ -11,9 +31,6 @@ Completed 2026-10-10. Default scenario "Forward Outpost": one MCV and 5000 credi
 - `npm test`: 50/50 pass. `npm run build`: pass.
 - Browser dev: the full MCV → HQ → power → barracks → motor pool → truck → income loop, rally, sell and keyboard focus were done with real clicks and keys. Preview: invalid placement feedback, 200-unit benchmark, no console messages.
 - Not measured: real-time frame pacing (the pane was hidden).
-
-## Next — M4: Combat and fog
-Weapons, armor, projectiles, turrets, veterancy, fog of war, full roster, airfield, BALANCE.md.
 
 ---
 

@@ -21,6 +21,8 @@ export interface LayerOptions {
   hovered: number;
   /** Entity ids the local player may see this frame (null = everything). */
   visible?: ((entity: Entity) => boolean) | null;
+  /** Remembered structures drawn in place of unseen live ones (fog memory). */
+  ghosts?: Iterable<Entity>;
 }
 
 /**
@@ -99,15 +101,18 @@ export class EntityLayer implements DepthLayer {
     const halfW = view.width / (2 * view.zoom) + 120;
     const halfH = view.height / (2 * view.zoom) + 120;
     let count = 0;
-    for (const entity of world.entities) {
+    const sources: Iterable<Entity>[] = options.ghosts ? [world.entities, options.ghosts] : [world.entities];
+    for (const source of sources) for (const entity of source) {
       if (count >= CAPACITY) break;
-      if (options.visible && !options.visible(entity)) continue;
+      if (source === world.entities && options.visible && !options.visible(entity)) continue;
       const tx = (entity.prevX + (entity.x - entity.prevX) * alpha) / s;
       const ty = (entity.prevY + (entity.y - entity.prevY) * alpha) / s;
       const sx = (tx - ty) * 32;
       const sy = (tx + ty) * 16;
       if (Math.abs(sx - view.x) > halfW || Math.abs(sy - view.y) > halfH) continue;
       let depth = tx + ty;
+      // Aircraft fly above everything on the ground.
+      if (entity.kind === 'unit' && world.rules.units.get(entity.type)!.movement === 'air') depth += 1000;
       if (entity.kind === 'building') {
         const def = world.rules.buildings.get(entity.type)!;
         depth += (def.footprint.w + def.footprint.h) / 2 - 1;
@@ -175,6 +180,14 @@ export class EntityLayer implements DepthLayer {
     }
     const sprites = this.spritesFor(world, entity);
     const facing = interpolateAngle(entity.prevFacing, entity.facing, this.alpha);
+    if (sprites.air) {
+      const lift = world.rules.combat.air.altitude;
+      context.fillStyle = 'rgba(14,20,14,.28)';
+      context.beginPath(); context.ellipse(x, y, sprites.radius * 0.9, sprites.radius * 0.4, 0, 0, Math.PI * 2); context.fill();
+      const direction = Math.round(facing / (256 / DIRECTIONS)) % DIRECTIONS;
+      drawSheet(context, sprites.body, direction, (world.tick >> 1) & 1, x, y - lift);
+      return;
+    }
     const direction = Math.round(facing / (256 / DIRECTIONS)) % DIRECTIONS;
     const moving = entity.next >= 0;
     let frame = 0;
@@ -198,7 +211,9 @@ export class EntityLayer implements DepthLayer {
   }
 
   private topOf(world: World, entity: Entity): number {
-    return entity.kind === 'unit' ? this.spritesFor(world, entity).top : this.buildingFor(world, entity).top * 0.75;
+    if (entity.kind !== 'unit') return this.buildingFor(world, entity).top * 0.75;
+    const sprites = this.spritesFor(world, entity);
+    return sprites.top + (sprites.air ? world.rules.combat.air.altitude : 0);
   }
 
   /** Health bars, cargo and progress above every sprite for readability. */
@@ -210,6 +225,7 @@ export class EntityLayer implements DepthLayer {
       const selected = this.options.selected.has(entity.id);
       const maxHp = this.maxHp(world, entity);
       const capturing = entity.task === 'capture' && entity.timer > 0;
+      if (entity.rank > 0) this.chevrons(context, entity.rank, this.screenX[i] + 12, this.screenY[i] - this.topOf(world, entity) + 2);
       if (!selected && entity.hp >= maxHp && !capturing) continue;
       const width = entity.kind === 'building' ? 46 : Math.max(18, this.spritesFor(world, entity).radius * 1.3);
       const x = this.screenX[i] - width / 2;
@@ -236,6 +252,22 @@ export class EntityLayer implements DepthLayer {
     }
   }
 
+  /** Veterancy insignia: one chevron for veteran, two for elite. */
+  private chevrons(context: CanvasRenderingContext2D, rank: number, x: number, y: number): void {
+    context.strokeStyle = 'rgba(16,22,16,.9)';
+    context.lineWidth = 3;
+    for (let pass = 0; pass < 2; pass++) {
+      for (let r = 0; r < rank; r++) {
+        const cy = y - r * 4;
+        context.beginPath();
+        context.moveTo(x - 4, cy - 2); context.lineTo(x, cy + 1); context.lineTo(x + 4, cy - 2);
+        context.stroke();
+      }
+      context.strokeStyle = rank > 1 ? '#f2d36b' : '#e6e0bf';
+      context.lineWidth = 1.4;
+    }
+  }
+
   /** Front-most visible entity under a world-pixel point. */
   pick(worldX: number, worldY: number, filter: (entity: Entity) => boolean): Entity | null {
     const world = this.world;
@@ -255,7 +287,8 @@ export class EntityLayer implements DepthLayer {
       } else {
         const sprites = this.spritesFor(world, entity);
         const r = Math.max(sprites.radius, 12);
-        if (Math.abs(dx) > r || dy > r * 0.6 || dy < -sprites.top) continue;
+        const ly = sprites.air ? dy + world.rules.combat.air.altitude : dy;
+        if (Math.abs(dx) > r || ly > r * 0.6 || ly < -sprites.top) continue;
       }
       // Units in front of buildings win; otherwise the front-most entity.
       const depth = this.depth[i] + (entity.kind === 'unit' ? 1000 : 0);
