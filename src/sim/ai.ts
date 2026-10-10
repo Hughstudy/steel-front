@@ -324,6 +324,8 @@ function structures(t: Think, snap: Snapshot): void {
   for (const step of plan.base) {
     if (planned(t, snap, step.type) >= step.count) continue;
     if (world.tick < Math.floor(step.afterTick * knobs.tempoPercent / 100)) break;
+    // Redundant production only pays when income outruns spending (credits banked).
+    if (player.credits < step.minCredits) break;
     next = step.type;
     break;
   }

@@ -2,7 +2,12 @@
   {
     "id": "lowlands",
     "name": "The Lowlands",
+    "subtitle": "Northern France · Autumn 1944",
     "seed": 19440917,
+    "generation": {},
+    "palette": {
+      "tint": "#ffd49a"
+    },
     "spawns": [
       {
         "x": 20,
@@ -71,6 +76,180 @@
       {
         "x": 74,
         "y": 18
+      }
+    ],
+    "supplyType": "supply_dump",
+    "derrickType": "oil_derrick"
+  },
+  {
+    "id": "ardennes",
+    "name": "The Ardennes",
+    "subtitle": "Belgian forest · Winter 1944",
+    "seed": 19441216,
+    "generation": {
+      "forestThreshold": 0.53,
+      "forestDensity": 0.8,
+      "rockThreshold": 0.7,
+      "riverCenter": 0.56,
+      "riverAmplitude": 11,
+      "rockMinY": 20,
+      "roadRows": [
+        34,
+        98
+      ],
+      "approachColumn": 30,
+      "eastRoad": [
+        100,
+        12,
+        118
+      ],
+      "farms": [
+        [
+          14,
+          40,
+          32,
+          58
+        ],
+        [
+          96,
+          70,
+          116,
+          90
+        ]
+      ],
+      "cottages": [
+        [
+          34,
+          30,
+          4
+        ],
+        [
+          37,
+          31,
+          5
+        ],
+        [
+          39,
+          37,
+          4
+        ],
+        [
+          33,
+          38,
+          6
+        ],
+        [
+          27,
+          36,
+          5
+        ],
+        [
+          96,
+          95,
+          4
+        ],
+        [
+          99,
+          101,
+          5
+        ],
+        [
+          104,
+          96,
+          4
+        ],
+        [
+          103,
+          102,
+          5
+        ],
+        [
+          98,
+          92,
+          6
+        ]
+      ]
+    },
+    "palette": {
+      "grass": "#c7cbc2",
+      "forest": "#5d6a5e",
+      "water": "#6c8a93",
+      "sand": "#b9b8ab",
+      "road": "#a59c8a",
+      "rock": "#8f938f",
+      "bridge": "#8f8676",
+      "field": "#bcbca9",
+      "background": "#2b3438",
+      "tint": "#b9d2ff"
+    },
+    "spawns": [
+      {
+        "x": 12,
+        "y": 18
+      },
+      {
+        "x": 112,
+        "y": 112
+      }
+    ],
+    "supplies": [
+      {
+        "x": 26,
+        "y": 12
+      },
+      {
+        "x": 10,
+        "y": 34
+      },
+      {
+        "x": 40,
+        "y": 24
+      },
+      {
+        "x": 20,
+        "y": 70
+      },
+      {
+        "x": 50,
+        "y": 58
+      },
+      {
+        "x": 118,
+        "y": 94
+      },
+      {
+        "x": 104,
+        "y": 102
+      },
+      {
+        "x": 88,
+        "y": 112
+      },
+      {
+        "x": 104,
+        "y": 30
+      },
+      {
+        "x": 76,
+        "y": 70
+      }
+    ],
+    "derricks": [
+      {
+        "x": 44,
+        "y": 44
+      },
+      {
+        "x": 86,
+        "y": 86
+      },
+      {
+        "x": 30,
+        "y": 110
+      },
+      {
+        "x": 96,
+        "y": 16
       }
     ],
     "supplyType": "supply_dump",

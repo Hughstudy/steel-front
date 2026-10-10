@@ -37,6 +37,9 @@ export class Effects {
     }
   }
 
+  /** Drop every live effect (new match or loaded save). */
+  clear(): void { this.alive.fill(0); }
+
   /** Convert simulation events (fixed-point tile units) to world-pixel effects. */
   consume(world: World, events: readonly WorldEvent[], visible: (x: number, y: number) => boolean): void {
     const s = world.subTile;

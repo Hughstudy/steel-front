@@ -15,8 +15,8 @@ const fallbackColors = ['#7e8761', '#5f704e', '#588082', '#afa184', '#b7a987', '
 export class Minimap {
   private readonly context: CanvasRenderingContext2D;
   private readonly background = document.createElement('canvas');
-  private readonly map: TerrainMap;
-  private readonly config: MapConfig;
+  private map: TerrainMap;
+  private config: MapConfig;
   private readonly jump: (tileX: number, tileY: number) => void;
   private readonly canvas: HTMLCanvasElement;
   private cssWidth = 200;
@@ -28,6 +28,16 @@ export class Minimap {
   private lastTileX = 64;
   private lastTileY = 64;
   private readonly observer: ResizeObserver;
+
+  /** Switch to another map (new match); listeners stay attached. */
+  setMap(map: TerrainMap, config: MapConfig): void {
+    this.map = map;
+    this.config = config;
+    this.lastTileX = config.spawn.x;
+    this.lastTileY = config.spawn.y;
+    this.createBackground();
+    this.resize();
+  }
 
   constructor(canvas: HTMLCanvasElement, map: TerrainMap, config: MapConfig,
     jump: (tileX: number, tileY: number) => void) {

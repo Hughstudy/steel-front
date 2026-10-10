@@ -22,6 +22,7 @@
     "rock": "#929486",
     "bridge": "#998f74",
     "field": "#a49c65",
-    "background": "#263737"
+    "background": "#263737",
+    "tint": "#ffe2b0"
   }
 }

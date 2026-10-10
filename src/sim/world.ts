@@ -40,6 +40,22 @@ export interface Player {
   start: number;
   /** Computer player state, or null for a human/scripted player. */
   ai: AiState | null;
+  /** Objective rule: false once the player's MCV (before deployment) or HQ is lost. */
+  alive: boolean;
+  /** Set once the player has owned an objective structure; from then on only it counts. */
+  deployed: boolean;
+  defeatTick: number;
+  stats: PlayerStats;
+}
+
+export interface PlayerStats { unitsBuilt: number; buildingsBuilt: number; unitsLost: number; buildingsLost: number }
+
+/** Terminal match state; the world stops advancing once it is set. */
+export interface MatchOutcome {
+  tick: number;
+  /** Winning player index, or -1 for a draw. */
+  winner: number;
+  draw: boolean;
 }
 
 export interface LoadOptions {
@@ -96,6 +112,9 @@ export class World {
   readonly events: WorldEvent[] = [];
   /** Fog of war (scenario flag); when off every player sees everything. */
   fogEnabled = true;
+  /** Objective rule (scenario flag); sandboxes leave it off. */
+  victory = false;
+  outcome: MatchOutcome | null = null;
   /** Increments whenever fog masks are recomputed (presentation cache key). */
   fogVersion = 0;
   commandSeq = 0;
@@ -146,7 +165,8 @@ export class World {
       index: this.players.length, faction, credits,
       ledger: { initial: credits, delivered: 0, oil: 0, spent: 0, refunded: 0, sold: 0 },
       queues: {}, power: { supply: 0, demand: 0 }, notice: '', noticeTick: 0, fog: createFog(this.nav.size),
-      start: -1, ai: null,
+      start: -1, ai: null, alive: true, deployed: false, defeatTick: -1,
+      stats: { unitsBuilt: 0, buildingsBuilt: 0, unitsLost: 0, buildingsLost: 0 },
     };
     this.players.push(player);
     return player;
@@ -226,6 +246,7 @@ export class World {
   loadScenario(scenario: ScenarioDef, options: LoadOptions = {}): void {
     const preset = this.rules.maps.get(scenario.map)!;
     this.fogEnabled = scenario.fog;
+    this.victory = scenario.victory;
     if (scenario.resources) {
       const dump = this.rules.buildings.get(preset.supplyType)!;
       const derrick = this.rules.buildings.get(preset.derrickType)!;
@@ -291,6 +312,8 @@ export class World {
   }
 
   step(): void {
+    // Outcomes are final: nothing moves, fires or earns after the terminal tick.
+    if (this.outcome) return;
     this.tick++;
     this.events.length = 0;
     for (const entity of this.entities) {
@@ -312,7 +335,35 @@ export class World {
     updateEconomy(this);
     updateProduction(this);
     this.flushRemovals();
+    this.updateObjectives();
     updateAi(this);
+  }
+
+  /**
+   * Strategic objective: before deployment a player's MCV keeps them in the match;
+   * once they have owned an objective structure (HQ), only that counts. The match
+   * ends when at most one player remains; simultaneous elimination is a draw.
+   */
+  private updateObjectives(): void {
+    if (!this.victory) return;
+    const holds = new Uint8Array(this.players.length);
+    for (const entity of this.entities) {
+      if (entity.owner < 0 || entity.hp <= 0) continue;
+      if (entity.kind === 'building') {
+        if (!this.rules.buildings.get(entity.type)!.capabilities.objective) continue;
+        holds[entity.owner] = 1;
+        this.players[entity.owner].deployed = true;
+      } else if (typeof this.rules.units.get(entity.type)!.capabilities.deploy === 'string') {
+        holds[entity.owner] |= this.players[entity.owner].deployed ? 0 : 1;
+      }
+    }
+    let alive = 0;
+    let winner = -1;
+    for (const player of this.players) {
+      if (player.alive && !holds[player.index]) { player.alive = false; player.defeatTick = this.tick; }
+      if (player.alive) { alive++; winner = player.index; }
+    }
+    if (alive <= 1 && this.players.length > 1) this.outcome = { tick: this.tick, winner: alive === 1 ? winner : -1, draw: alive === 0 };
   }
 
   private executeCommands(): void {

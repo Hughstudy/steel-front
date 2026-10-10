@@ -339,6 +339,8 @@ function resolveDeaths(world: World): void {
         world.events.push({ kind: 'promote', x: killer.x, y: killer.y, a: rank, weapon: '', id: killer.id });
       }
     }
+    const loser = world.players[dead.owner];
+    if (loser) { if (dead.kind === 'unit') loser.stats.unitsLost++; else loser.stats.buildingsLost++; }
     world.events.push({ kind: 'death', x: dead.x, y: dead.y, a: dead.kind === 'building' ? 2 : layerOf(world, dead) === 'air' ? 1 : 0, weapon: dead.type, id });
     world.remove(id);
   }

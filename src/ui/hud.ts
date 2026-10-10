@@ -38,8 +38,8 @@ function element<T extends HTMLElement>(id: string): T {
 
 export class Hud {
   private readonly minimap: Minimap;
-  private readonly map: TerrainMap;
-  private readonly config: MapConfig;
+  private map: TerrainMap;
+  private config: MapConfig;
   private readonly zoom = element<HTMLOutputElement>('zoom-level');
   private readonly fps = element<HTMLSpanElement>('fps');
   private readonly coordinates = element<HTMLSpanElement>('coordinates');
@@ -56,12 +56,7 @@ export class Hud {
     this.map = map;
     this.config = config;
     this.minimap = new Minimap(element<HTMLCanvasElement>('minimap'), map, config, actions.jump);
-    element('map-name').textContent = config.name.toUpperCase();
-    element('map-subtitle').textContent = config.subtitle;
-    element('map-seed').textContent = `SEED ${map.seed}`;
-    document.title = `Steel Front — ${config.name}`;
-    const mapSize = document.querySelector('.map-size');
-    if (mapSize) mapSize.textContent = `${map.width} × ${map.height}`;
+    this.labels();
     element('zoom-in').addEventListener('click', actions.zoomIn);
     element('zoom-out').addEventListener('click', actions.zoomOut);
     element('camera-reset').addEventListener('click', actions.reset);
@@ -76,6 +71,25 @@ export class Hud {
       if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) dialog.close();
     });
     this.inspect(config.spawn.x, config.spawn.y);
+  }
+
+  /** Show another map (new match): labels, minimap background and terrain intel. */
+  setMap(map: TerrainMap, config: MapConfig): void {
+    this.map = map;
+    this.config = config;
+    this.minimap.setMap(map, config);
+    this.lastInspected = this.lastTerrain = -1;
+    this.labels();
+    this.inspect(config.spawn.x, config.spawn.y);
+  }
+
+  private labels(): void {
+    element('map-name').textContent = this.config.name.toUpperCase();
+    element('map-subtitle').textContent = this.config.subtitle;
+    element('map-seed').textContent = `SEED ${this.map.seed}`;
+    document.title = `Steel Front — ${this.config.name}`;
+    const mapSize = document.querySelector('.map-size');
+    if (mapSize) mapSize.textContent = `${this.map.width} × ${this.map.height}`;
   }
 
   update(view: CameraView, stats: FrameStats): void {

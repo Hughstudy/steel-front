@@ -1,0 +1,10 @@
+{
+  "credits": 5000,
+  "maps": ["lowlands", "ardennes"],
+  "defaultMap": "lowlands",
+  "defaultFaction": "allies",
+  "start": {
+    "allies": [{ "type": "allied_mcv", "count": 1 }],
+    "axis": [{ "type": "axis_mcv", "count": 1 }]
+  }
+}

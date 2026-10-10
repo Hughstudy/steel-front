@@ -1,5 +1,27 @@
 # Steel Front status
 
+## Done — M6: Complete match and static delivery
+Completed 2026-10-10. The game opens on a main menu. New Skirmish lets you choose a faction (Allies or Axis), a map (The Lowlands or The Ardennes) and an AI difficulty, then plays to a decided result: you lose when your MCV (before deploying) or your HQ is destroyed, and you win when the enemy's is.
+
+- **Menus:** pause, settings and controls. Volume, mute and screen shake are saved; screen shake respects reduced-motion.
+- **Results:** a statistics table with Play Again.
+- **Saves:** three versioned save slots, with continue and load from the main menu. Corrupt or incompatible saves are rejected with a reason and leave the battle untouched.
+- **Sound effects:** synthesized with WebAudio (no audio files).
+- **Presentation:** screenshake and a day-light tint.
+- **AI difficulty:** retuned so Veteran is the strongest.
+- The static `dist/` build was tested in a URL subdirectory. Caddy examples are in README.
+- Details and evidence: `docs/verification/M6.md`.
+
+## Verification (M6)
+- `npm test`: 77/77 pass. `npm run build`: pass (JS 72.8 kB gzip).
+- **Dev, with real clicks:** setup, deploy and build; save, load and corrupt-save rejection; settings persistence; quit and new match. Defeat at 6:39 with the results screen. Victory (player side driven by the AI planner) at 19:18, identical to the headless run.
+- **200-unit stress:** frame CPU p95 1.3 ms, max 4.5 ms; sim tick max 4.3 ms.
+- **Subdirectory build** at `/games/steel-front/`: saved mid-battle, reloaded the page and loaded; 600 more ticks matched the uninterrupted fingerprint exactly. Preview had no console messages.
+- **Not done:** a fully hand-played match to victory, listening to the audio by ear, and long-session frame pacing on a defined laptop.
+
+## Next — review fixes
+Fix the seven P2 findings R1–R7 from the independent review below, with regressions.
+
 ## Independent review — M0–M5
 
 Reviewed 2026-10-10 at committed M5 baseline `e67f5c0`, isolated from active M6 edits. The build and all 69 tests pass. M0–M5 systems are implemented, including the computer opponent, but seven reproduced P2 defects remain: artillery minimum-range stalling; hidden-structure preview leaks; resource/capture orders retaining old movement; aircraft move input over blocked ground; production keyboard focus loss; placement moving hostile units; and AI oil capture after MCV relocation.

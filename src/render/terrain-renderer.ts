@@ -34,6 +34,12 @@ export class TerrainRenderer {
     this.totalChunks = this.chunks.length;
   }
 
+  /** Release the baked chunk canvases (their backing stores dominate memory). */
+  dispose(): void {
+    for (const chunk of this.chunks) chunk.canvas.width = chunk.canvas.height = 0;
+    this.chunks.length = 0;
+  }
+
   private bakeChunk(chunkX: number, chunkY: number, atlas: HTMLCanvasElement[]): GroundChunk {
     const canvas = document.createElement('canvas');
     canvas.width = CHUNK_TILES * 64 + PADDING * 2;

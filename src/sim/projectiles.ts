@@ -53,6 +53,17 @@ export class ProjectilePool {
 
   hasRoom(): boolean { return this.freeCount > 0; }
 
+  /** Free-slot stack, bottom to top (the next spawn takes the last entry). */
+  freeSlots(): number[] { return Array.from(this.free.subarray(0, this.freeCount)); }
+
+  /** Restore the free stack and counters after slot data was written (save loading). */
+  restoreFree(free: readonly number[], peak: number): void {
+    this.free.set(free);
+    this.freeCount = free.length;
+    this.count = this.capacity - free.length;
+    this.peak = peak;
+  }
+
   spawn(x: number, y: number, tx: number, ty: number, target: number, shooter: number, owner: number, weapon: number, rank: number): number {
     if (this.freeCount === 0) return -1;
     const i = this.free[--this.freeCount];

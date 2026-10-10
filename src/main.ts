@@ -11,7 +11,8 @@ import productionData from '../data/production.json';
 import weaponData from '../data/weapons.json';
 import combatData from '../data/combat.json';
 import aiData from '../data/ai.json';
-import type { MapConfig } from './types.ts';
+import skirmishData from '../data/skirmish.json';
+import type { MapConfig, TerrainMap } from './types.ts';
 import { Camera } from './engine/camera.ts';
 import { CameraInput } from './engine/input.ts';
 import { GameLoop } from './engine/loop.ts';
@@ -32,60 +33,168 @@ import { Selection } from './ui/selection.ts';
 import { SelectionPanel } from './ui/selection-panel.ts';
 import { GameInput } from './ui/game-input.ts';
 import { contextOrder } from './ui/orders.ts';
+import { clock, loadPreferences, Menus, readSlot, savePreferences, writeSlot } from './ui/menus.ts';
+import { Sfx } from './audio/sfx.ts';
+import type { Cue } from './audio/sfx.ts';
+import { mapConfigFor, scenarioFor } from './sim/skirmish.ts';
+import type { MatchSetup } from './sim/skirmish.ts';
+import { loadMatch, MAX_SAVE_CHARS, SaveError, serializeMatch } from './sim/save.ts';
 import { ProductionPanel } from './ui/production-panel.ts';
 import { deployPreview, drawFootprint, Placement, problemText } from './ui/placement.ts';
 import type { HudMode } from './ui/placement.ts';
 
-const config: MapConfig = mapData;
+const baseConfig: MapConfig = mapData;
 const rules = loadRules({
   game: gameData, terrain: terrainData, factions: factionData, units: unitData, scenarios: scenarioData,
   buildings: buildingData, economy: economyData, maps: mapPresetData, production: productionData,
-  weapons: weaponData, combat: combatData, ai: aiData,
+  weapons: weaponData, combat: combatData, ai: aiData, skirmish: skirmishData,
 });
 const canvas = document.querySelector<HTMLCanvasElement>('#battlefield')!;
 const viewport = document.querySelector<HTMLElement>('#viewport')!;
-const map = generateTerrain(config);
+
+/** Generated terrain per map preset (small typed arrays; the renderer caches are per match). */
+const terrains = new Map<string, { map: TerrainMap; config: MapConfig }>();
+function terrainFor(id: string): { map: TerrainMap; config: MapConfig } {
+  let entry = terrains.get(id);
+  if (!entry) {
+    const preset = rules.maps.get(id);
+    if (!preset) throw new Error(`unknown map ${id}`);
+    const config = mapConfigFor(baseConfig, preset);
+    entry = { map: generateTerrain(config), config };
+    terrains.set(id, entry);
+  }
+  return entry;
+}
+
+let mapId = rules.skirmish.defaultMap;
+let { map, config } = terrainFor(mapId);
 const camera = new Camera(map.width, map.height);
-const renderer = new TerrainRenderer(canvas, map, config);
+let renderer = new TerrainRenderer(canvas, map, config);
 const layer = new EntityLayer();
 const markers = new OrderMarkers();
 const fogLayer = new FogLayer(map.width, map.height);
 const effects = new Effects();
 const placement = new Placement();
-const scenarioSelect = document.querySelector<HTMLSelectElement>('#scenario-select')!;
 const selection = new Selection();
+const sfx = new Sfx();
+const prefs = loadPreferences();
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const PLAYER = 0;
-let world = new World(rules, map, config.seed);
-let scenarioId = 'm5-skirmish';
-const difficultySelect = document.querySelector<HTMLSelectElement>('#difficulty-select')!;
+/** The running match's setup; null while no match exists (menu backdrop). */
+let setup: MatchSetup | null = null;
+let world = backdropWorld();
+let home = { x: config.spawn.x, y: config.spawn.y };
 /** Entity shown in the panel when nothing is selected (live entity id or a memory ghost). */
 let inspected: Entity | null = null;
 let showGrid = false;
 let presentationTime = 0;
+/** Wall-clock ms at which the terminal outcome was first seen (-1 none), and whether results were shown. */
+let outcomeSeen = -1;
+let resultsShown = false;
+/** Screenshake energy (0..1), decays over time; presentation only. */
+let trauma = 0;
 const stats = { fps: 60, frameMs: 0, tick: 0, visibleChunks: 0, grid: false };
 
-function startScenario(id: string): void {
-  const scenario = rules.scenarios.get(id)!;
-  scenarioId = id;
-  world = new World(rules, map, config.seed);
-  world.loadScenario(scenario, { difficulty: difficultySelect.value || rules.ai.defaultDifficulty });
-  document.getElementById('difficulty-picker')!.hidden = !scenario.players.some(p => p.ai);
+/** An empty, fog-free world on the current map: the backdrop behind the main menu. */
+function backdropWorld(): World {
+  const empty = new World(rules, map, rules.maps.get(mapId)!.seed);
+  empty.fogEnabled = false;
+  return empty;
+}
+
+/** Switch terrain, renderer and minimap to another map, releasing the previous renderer's caches. */
+function useMap(id: string): void {
+  if (id === mapId) return;
+  const next = terrainFor(id);
+  if (next.map.width !== map.width || next.map.height !== map.height) throw new Error('all maps must share the base dimensions');
+  renderer.dispose();
+  mapId = id;
+  map = next.map;
+  config = next.config;
+  renderer = new TerrainRenderer(canvas, map, config);
+  hud.setMap(map, config);
+}
+
+/** Make `next` the active match and reset all per-match presentation state. */
+function install(next: World, nextSetup: MatchSetup | null, focus: { x: number; y: number }, title: string, text: string): void {
+  world = next;
+  setup = nextSetup;
   layer.warm(world);
   fogLayer.reset();
   ghosts.clear();
-  selection.clear();
+  selection.reset();
   inspected = null;
-  placement.cancel();
-  camera.reset(scenario.camera.x, scenario.camera.y);
-  scenarioSelect.value = id;
-  document.getElementById('mission-title')!.firstChild!.textContent = scenario.name.toUpperCase();
-  document.getElementById('mission-text')!.textContent = scenario.description;
+  setMode('');
+  markers.clear();
+  effects.clear();
+  trauma = 0;
+  outcomeSeen = -1;
+  resultsShown = false;
+  menus.clearResults();
+  watch.reset();
+  home = focus;
+  camera.reset(focus.x, focus.y);
+  document.getElementById('mission-title')!.firstChild!.textContent = title.toUpperCase();
+  document.getElementById('mission-text')!.textContent = text;
+  document.getElementById('mode-label')!.textContent = !nextSetup ? 'MAIN MENU' : nextSetup.kind === 'skirmish' ? 'SKIRMISH' : 'DEVELOPMENT SCENARIO';
+  document.getElementById('bottom-mode')!.textContent = !nextSetup ? 'MAIN MENU' : nextSetup.kind === 'skirmish'
+    ? `SKIRMISH · ${rules.ai.difficulties.get(nextSetup.difficulty)!.name.toUpperCase()} COMPUTER OPPONENT` : 'DEVELOPMENT SCENARIO · NO VICTORY CONDITION';
+  lastPanel = 0;
 }
 
-const reset = (): void => {
-  const scenario = rules.scenarios.get(scenarioId)!;
-  camera.reset(scenario.camera.x, scenario.camera.y);
-};
+function startMatch(next: MatchSetup): void {
+  const scenario = scenarioFor(rules, next);
+  useMap(scenario.map);
+  const fresh = new World(rules, map, rules.maps.get(scenario.map)!.seed);
+  fresh.loadScenario(scenario, { difficulty: next.difficulty });
+  install(fresh, next, scenario.camera, scenario.name, scenario.description);
+  menus.stack.reset();
+  canvas.focus();
+}
+
+function quitToMenu(): void {
+  install(backdropWorld(), null, { x: map.width / 2, y: map.height / 2 }, 'Steel Front', 'Choose NEW SKIRMISH to begin.');
+  menus.showMain();
+}
+
+function matchLabel(): string {
+  if (!setup) return '';
+  const scenario = scenarioFor(rules, setup);
+  const faction = rules.factions.get(world.players[PLAYER]?.faction ?? '')?.name ?? '';
+  return setup.kind === 'skirmish' ? `${faction} · ${rules.maps.get(setup.map)!.name} · ${rules.ai.difficulties.get(setup.difficulty)!.name}` : `${scenario.name} (development)`;
+}
+
+function saveMatch(slot: number): string | null {
+  if (!setup) return 'no battle in progress';
+  if (world.outcome) return 'the battle is over';
+  const text = serializeMatch(world, setup, matchLabel());
+  if (text.length > MAX_SAVE_CHARS) return 'the battle is too large to save';
+  return writeSlot(slot, text, { label: matchLabel(), savedAt: new Date().toISOString(), tick: world.tick });
+}
+
+function loadSaved(slot: number): string | null {
+  const text = readSlot(slot);
+  if (text === null) return 'the slot is empty';
+  let loaded: ReturnType<typeof loadMatch>;
+  try {
+    loaded = loadMatch(text, rules, s => terrainFor(scenarioFor(rules, s).map).map);
+  } catch (error) {
+    return error instanceof SaveError ? error.message : 'the save data is invalid';
+  }
+  // Validated completely: only now replace the active match.
+  const scenario = scenarioFor(rules, loaded.setup);
+  useMap(scenario.map);
+  const next = loaded.world;
+  const own = next.entities.find(e => e.owner === PLAYER && (rules.buildings.get(e.type)?.capabilities.objective || typeof rules.units.get(e.type)?.capabilities.deploy === 'string'));
+  const start = next.players[PLAYER]?.start ?? -1;
+  const focus = own ? { x: own.x / next.subTile, y: own.y / next.subTile } : start >= 0 ? { x: start % map.width, y: (start / map.width) | 0 } : scenario.camera;
+  install(next, loaded.setup, focus, scenario.name, scenario.description);
+  menus.showPause();
+  document.getElementById('pause-status')!.textContent = `Loaded slot ${slot} at ${clock(next.tick, rules.game.ticksPerSecond)}. Resume when ready.`;
+  return null;
+}
+
+const reset = (): void => { camera.reset(home.x, home.y); };
 const toggleGrid = (): void => { showGrid = !showGrid; };
 const hud = new Hud(map, config, {
   zoomIn: () => camera.zoomAt(1.2),
@@ -165,10 +274,12 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
       placement.update(world, PLAYER, tileX, tileY);
       if (placement.problem !== '' && placement.problem !== 'occupied') {
         markers.add(tileX, tileY, 'invalid', presentationTime);
+        sfx.play('denied');
         notice(`Cannot place: ${problemText(placement.problem)}`);
         return true;
       }
       world.enqueue({ player: PLAYER, kind: 'place', ids: [], x: origin % world.nav.width, y: (origin / world.nav.width) | 0, type: placement.type });
+      sfx.play('place');
       setMode('');
       return true;
     }
@@ -177,6 +288,7 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
       if (ids.length) {
         world.enqueue({ player: PLAYER, kind: 'amove', ids, x: Math.floor(tileX), y: Math.floor(tileY) });
         markers.add(tileX, tileY, 'attack', presentationTime);
+        sfx.play('attack');
       }
       setMode('');
       return true;
@@ -216,6 +328,7 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
     if (attackMove && world.nav.inBounds(x, y)) {
       world.enqueue({ player: PLAYER, kind: 'amove', ids, x, y });
       markers.add(tileX, tileY, 'attack', presentationTime);
+      sfx.play('attack');
       return;
     }
     // Unseen or remembered targets take a plain move order (no hidden information).
@@ -223,6 +336,7 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
     if (context !== 'move' && target) {
       world.enqueue({ player: PLAYER, kind: context, ids, x, y, target: target.id });
       markers.add(target.x / world.subTile, target.y / world.subTile, context === 'capture' || context === 'attack' ? 'attack' : 'rally', presentationTime);
+      sfx.play(context === 'attack' ? 'attack' : 'order');
       return;
     }
     let kind: 'move' | 'nearest' | 'invalid' = 'invalid';
@@ -235,10 +349,12 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
       if (resolved >= 0) {
         world.enqueue({ player: PLAYER, kind: 'move', ids, x, y });
         markers.add((resolved % nav.width) + 0.5, ((resolved / nav.width) | 0) + 0.5, kind, presentationTime);
+        sfx.play('order');
         return;
       }
     }
     markers.add(tileX, tileY, kind, presentationTime);
+    sfx.play('denied');
   },
   stop: stopSelected,
   centerOn: ids => {
@@ -252,11 +368,6 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
   },
 });
 
-for (const scenario of rules.scenarios.values()) scenarioSelect.add(new Option(scenario.name, scenario.id));
-for (const level of rules.ai.difficulties.values()) difficultySelect.add(new Option(level.name, level.id));
-difficultySelect.value = rules.ai.defaultDifficulty;
-difficultySelect.addEventListener('change', () => { startScenario(scenarioId); canvas.focus(); });
-scenarioSelect.addEventListener('change', () => { startScenario(scenarioSelect.value); canvas.focus(); });
 document.getElementById('action-haul')!.addEventListener('click', () => {
   const ids = selectedUnits();
   if (ids.length) world.enqueue({ player: PLAYER, kind: 'harvest', ids, x: 0, y: 0 });
@@ -278,6 +389,7 @@ const production = new ProductionPanel({
       return;
     }
     world.enqueue({ player: PLAYER, kind: 'build', ids: [], x: 0, y: 0, type });
+    sfx.play('build');
   },
   cancel: type => {
     if (placement.mode === 'place' && placement.type === type) setMode('');
@@ -302,7 +414,6 @@ function resize(): void {
 const observer = new ResizeObserver(resize);
 observer.observe(viewport);
 resize();
-startScenario(scenarioId);
 hud.inspect(config.spawn.x, config.spawn.y);
 
 const dots: MinimapDots = { count: 0, x: new Float32Array(4096), y: new Float32Array(4096), color: [] };
@@ -382,8 +493,10 @@ const deployButton = document.getElementById('action-deploy')!;
 const haulButton = document.getElementById('action-haul')!;
 const stopButton = document.getElementById('action-stop')!;
 const amoveButton = document.getElementById('action-amove')!;
+const clockLabel = document.getElementById('clock')!;
 function updateHud(): void {
   const player = world.players[PLAYER];
+  clockLabel.textContent = clock(world.tick, rules.game.ticksPerSecond);
   funds.textContent = String(player?.credits ?? 0);
   if (player) {
     powerLabel.textContent = `${player.power.demand}/${player.power.supply}`;
@@ -403,11 +516,71 @@ let lastPanel = 0;
 let frames = 0;
 let renderDuration = 0;
 let simDuration = 0;
-/** One authoritative tick, then hand its events to the cosmetic effects. */
+/** One authoritative tick, then hand its events to the cosmetic effects and sound. */
 function tick(): void {
   world.step();
   effects.consume(world, world.events, tileVisible);
+  hear();
 }
+
+/** Battle sounds and shake for visible events near the view; louder near the screen centre. */
+function hear(): void {
+  const view = camera.view;
+  const s = world.subTile;
+  const reach = Math.max(view.width, view.height) / view.zoom;
+  for (const event of world.events) {
+    const tx = event.x / s;
+    const ty = event.y / s;
+    if (!tileVisible(tx, ty)) continue;
+    const distance = Math.hypot((tx - ty) * 32 - view.x, (tx + ty) * 16 - view.y);
+    const level = 1 - distance / reach;
+    if (level <= 0) continue;
+    let cue: Cue | null = null;
+    if (event.kind === 'fire' || event.kind === 'impact') {
+      const weapon = rules.weapons.get(event.weapon);
+      if (!weapon) continue;
+      if (event.kind === 'fire') cue = weapon.damageType === 'small' ? 'fire-small' : weapon.splashRadius > 0 ? 'fire-heavy' : 'fire-gun';
+      else if (weapon.splashRadius > 0) { cue = 'impact'; trauma = Math.min(1, trauma + 0.04 * level); }
+    } else if (event.kind === 'death') {
+      if (event.a === 2) { cue = 'explosion-big'; trauma = Math.min(1, trauma + 0.55 * level); }
+      else if (event.a === 1 || rules.units.get(event.weapon)?.armor !== 'infantry') { cue = 'explosion'; trauma = Math.min(1, trauma + 0.2 * level); }
+    }
+    if (cue) sfx.play(cue, level);
+  }
+}
+
+/** Per-frame feedback derived from the local player's state (no simulation reads besides what the HUD shows). */
+const watch = {
+  selection: new Set<number>(),
+  notice: 0,
+  units: 0,
+  buildings: 0,
+  ready: new Set<string>(),
+  reset(): void { this.selection.clear(); this.notice = world.players[PLAYER]?.noticeTick ?? 0; this.units = this.buildings = 0; this.ready.clear(); this.sync(); },
+  sync(): void {
+    const player = world.players[PLAYER];
+    if (player) { this.units = player.stats.unitsBuilt; this.buildings = player.stats.buildingsBuilt; }
+  },
+  update(): void {
+    let added = false;
+    for (const id of selection.ids) if (!this.selection.has(id)) { added = true; break; }
+    if (added || selection.ids.size !== this.selection.size) {
+      if (added) sfx.play('select');
+      this.selection = new Set(selection.ids);
+    }
+    const player = world.players[PLAYER];
+    if (!player) return;
+    if (player.noticeTick > this.notice) { this.notice = player.noticeTick; sfx.play('denied'); }
+    if (player.stats.unitsBuilt > this.units) sfx.play('build', 0.7);
+    if (player.stats.buildingsBuilt > this.buildings) sfx.play('place');
+    this.sync();
+    for (const [category, queue] of Object.entries(player.queues)) {
+      const ready = queue[0]?.reason === 'ready';
+      if (ready && !this.ready.has(category)) sfx.play('ready');
+      if (ready) this.ready.add(category); else this.ready.delete(category);
+    }
+  },
+};
 
 function simulate(): void {
   const started = performance.now();
@@ -418,8 +591,20 @@ function simulate(): void {
 function renderFrame(alpha: number, dt: number): void {
   const started = performance.now();
   presentationTime += dt;
+  sfx.hold(document.hidden);
+  if (!setup && !menus.paused) menus.showMain();
+  if (!setup) camera.pan(Math.cos(presentationTime / 9) * 22 * dt, Math.sin(presentationTime / 7) * 12 * dt, true);
   cameraInput.update(dt);
   camera.update(dt);
+  checkOutcome();
+  watch.update();
+  // Bounded, decaying screenshake: offsets only the drawn view, never input or simulation.
+  trauma = Math.max(0, trauma - dt * 1.8);
+  const shake = prefs.shake && !reducedMotion.matches ? trauma * trauma * 7 : 0;
+  const shakeX = shake * Math.sin(presentationTime * 71);
+  const shakeY = shake * Math.cos(presentationTime * 53) * 0.6;
+  camera.view.x += shakeX;
+  camera.view.y += shakeY;
   selection.prune(world, PLAYER);
   effects.now = presentationTime;
   fogLayer.update(world, PLAYER);
@@ -430,7 +615,10 @@ function renderFrame(alpha: number, dt: number): void {
   const context = canvas.getContext('2d')!;
   effects.drawProjectiles(context, world, world.projectiles, alpha, tileVisible);
   effects.draw(context);
+  dayTint(context);
   fogLayer.draw(context);
+  camera.view.x -= shakeX;
+  camera.view.y -= shakeY;
   if (placement.mode === 'place' && gameInput.pointerTile(hoverTile)) {
     placement.update(world, PLAYER, hoverTile.x, hoverTile.y);
     placement.draw(context, world, layer);
@@ -473,7 +661,90 @@ function renderFrame(alpha: number, dt: number): void {
     lastReport = started;
   }
 }
+/** Subtle light of the map's season, slowly varying over a 20-minute day; soft-light keeps contrast. */
+function dayTint(context: CanvasRenderingContext2D): void {
+  const tint = config.palette.tint;
+  if (!tint) return;
+  context.save();
+  context.setTransform(1, 0, 0, 1, 0, 0);
+  context.globalCompositeOperation = 'soft-light';
+  context.globalAlpha = 0.16 + 0.06 * Math.sin(world.tick / (20 * 60 * 20) * Math.PI * 2);
+  context.fillStyle = tint;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.restore();
+}
+
+/** Results appear shortly after the terminal tick so the final explosion can be seen. */
+function checkOutcome(): void {
+  if (!setup || !world.outcome || resultsShown) return;
+  if (outcomeSeen < 0) {
+    outcomeSeen = performance.now();
+    setMode('');
+    const won = world.outcome.winner === PLAYER;
+    sfx.hold(false);
+    sfx.play(won ? 'victory' : 'defeat');
+  }
+  if (performance.now() - outcomeSeen < 2500 || menus.paused) return;
+  resultsShown = true;
+  menus.showResults(world, PLAYER, true);
+}
+
+const menus = new Menus({
+  rules,
+  prefs,
+  get reducedMotion() { return reducedMotion.matches; },
+  start: next => {
+    try { startMatch(next); } catch (error) { console.error(error); }
+  },
+  resume: () => { canvas.focus(); },
+  quitToMenu,
+  save: saveMatch,
+  load: loadSaved,
+  playAgain: () => { if (setup) startMatch(setup); },
+  applyPreferences: () => {
+    sfx.setVolume(prefs.volume);
+    sfx.setMuted(prefs.muted);
+    savePreferences(prefs);
+    syncAudioButton();
+  },
+  click: () => sfx.play('click'),
+  matchActive: () => setup !== null,
+  canSave: () => setup !== null && world.outcome === null,
+  summary: () => setup ? `${matchLabel()} · ${clock(world.tick, rules.game.ticksPerSecond)}${world.outcome ? ' · battle over' : ''}` : 'No battle in progress.',
+});
+const audioButton = document.getElementById('audio-toggle')!;
+function syncAudioButton(): void {
+  audioButton.setAttribute('aria-pressed', String(prefs.muted));
+  document.getElementById('audio-state')!.textContent = prefs.muted ? 'OFF' : 'ON';
+  menus.syncSettings();
+}
+function toggleMute(): void {
+  prefs.muted = !prefs.muted;
+  sfx.setMuted(prefs.muted);
+  savePreferences(prefs);
+  syncAudioButton();
+}
+sfx.setVolume(prefs.volume);
+sfx.setMuted(prefs.muted);
+syncAudioButton();
+audioButton.addEventListener('click', toggleMute);
+// Audio may only start from a user gesture (browser autoplay policy).
+for (const type of ['pointerdown', 'keydown'] as const) window.addEventListener(type, () => sfx.unlock(), { capture: true });
+const openPause = (): void => { if (setup && !menus.paused) { setMode(''); menus.showPause(); } };
+document.getElementById('pause-button')!.addEventListener('click', openPause);
+document.getElementById('help-toggle')!.addEventListener('click', () => menus.stack.open(document.getElementById('field-guide') as HTMLDialogElement));
+window.addEventListener('keydown', event => {
+  if (event.ctrlKey || event.metaKey || event.altKey || document.querySelector('dialog[open]')) return;
+  if (event.target instanceof HTMLElement && /INPUT|TEXTAREA|SELECT/.test(event.target.tagName)) return;
+  if (event.code === 'KeyP' || event.code === 'F10') { event.preventDefault(); openPause(); }
+  else if (event.code === 'KeyM' && !event.repeat) toggleMute();
+});
+// Hiding the page opens the pause menu, so returning never drops the player straight into action.
+document.addEventListener('visibilitychange', () => { if (document.hidden) openPause(); });
+
 const loop = new GameLoop(simulate, renderFrame);
+loop.paused = () => !setup || menus.paused || world.outcome !== null;
+menus.showMain();
 loop.start();
 
 /**
@@ -507,7 +778,8 @@ function advance(ticks: number): number {
 // Debug/QA hook for measuring in the browser without affecting the simulation.
 (window as unknown as { steelFront: unknown }).steelFront = { get world() { return world; },
   /** Development diagnostics: computer players' recent decisions and waves (not shown in the player HUD). */
-  ai: () => world.players.filter(p => p.ai).map(p => ({ player: p.index, difficulty: p.ai!.difficulty, waves: p.ai!.waves, log: p.ai!.log.slice(-20) })), camera, selection, layer, benchmark, startScenario, advance, placement, effects, fogLayer,
+  ai: () => world.players.filter(p => p.ai).map(p => ({ player: p.index, difficulty: p.ai!.difficulty, waves: p.ai!.waves, log: p.ai!.log.slice(-20) })), camera, selection, layer, benchmark, advance, placement, effects, fogLayer, sfx, menus,
+  startMatch, get setup() { return setup; }, get trauma() { return trauma; }, get mapId() { return mapId; }, get renderer() { return renderer; },
   render: () => { lastPanel = 0; renderFrame(1, 0); },
   /** Page coordinates of an entity's ground point, for driving real pointer input in QA. */
   screenOf: (id: number) => {
@@ -523,6 +795,7 @@ function advance(ticks: number): number {
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     loop.stop();
+    renderer.dispose();
     cameraInput.destroy();
     gameInput.destroy();
     observer.disconnect();

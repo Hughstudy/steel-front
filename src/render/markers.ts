@@ -11,6 +11,8 @@ const LIFETIME = 0.9;
 export class OrderMarkers {
   private readonly markers: Marker[] = [];
 
+  clear(): void { this.markers.length = 0; }
+
   /** Tile-space centre coordinates. */
   add(x: number, y: number, kind: MarkerKind, now: number): void {
     if (this.markers.length > 24) this.markers.shift();

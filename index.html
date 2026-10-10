@@ -5,19 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#26332b" />
     <meta name="description" content="Steel Front — an isometric World War II strategy game. Reconnoiter a procedurally generated battlefield." />
-    <title>Steel Front — Operation Greenbridge</title>
+    <title>Steel Front</title>
   </head>
   <body>
     <div id="app">
       <header class="topbar">
         <div class="wordmark" aria-label="Steel Front"><span class="insignia" aria-hidden="true">✦</span><span>STEEL <b>FRONT</b></span></div>
         <span class="top-divider"></span>
-        <span class="mode"><i></i> <span id="mode-label">M5 <span class="mode-slash">/</span> SKIRMISH AI</span></span>
+        <span class="mode"><i></i> <span id="mode-label">SKIRMISH</span></span>
         <div class="resources" aria-label="Resources">
           <span class="resource"><span class="resource-icon" aria-hidden="true">$</span><span class="resource-label">FUNDS</span><b id="funds" aria-live="off">0</b></span>
           <span class="resource"><span class="resource-icon power-icon" aria-hidden="true">ϟ</span><span class="resource-label">POWER</span><b id="power">—</b></span>
-          <label class="scenario-picker"><span class="resource-label">SCENARIO</span><select id="scenario-select" aria-label="Scenario"></select></label><label class="scenario-picker" id="difficulty-picker"><span class="resource-label">AI</span><select id="difficulty-select" aria-label="Computer opponent difficulty"></select></label>
+          <span class="resource"><span class="resource-icon" aria-hidden="true">◷</span><span class="resource-label">TIME</span><b id="clock">00:00</b></span>
         </div>
+        <button class="top-button" id="audio-toggle" aria-pressed="false" title="Mute or unmute sound (M)">SOUND <b id="audio-state">ON</b></button>
+        <button class="top-button" id="pause-button" title="Pause and open the game menu (P or F10)">❚❚ <span>MENU</span></button>
         <button class="help-button" id="help-toggle" aria-label="Open controls and mission briefing" title="Controls and briefing">? <span>FIELD GUIDE</span></button>
       </header>
       <main id="viewport" aria-label="Battlefield viewport">
@@ -37,9 +39,73 @@
           <div class="guide-label">STEEL FRONT · FIELD MANUAL 01</div><button id="help-close" class="guide-close" aria-label="Close field guide">×</button>
           <h2 id="guide-title">Know your ground.</h2>
           <p>Deploy the construction vehicle into a headquarters, then build a generator, barracks and motor pool from the production panel. Supply trucks haul crates from neutral dumps to your headquarters; engineers capture oil derricks for steady income. Buildings draw power: when demand exceeds supply, production runs at a quarter speed. In combat, AT guns and tanks kill armour, rifles and MGs cut down infantry and gun crews, artillery hits from long range, and fighters own the sky. Units you can't see stay hidden in the fog, and enemy structures you've scouted are remembered as last seen. Units gain veterancy from kills.</p>
-          <dl class="guide-controls"><div><dt>Left click / drag</dt><dd>Select unit / box select · Shift adds</dd></div><div><dt>Right click</dt><dd>Move · on a visible enemy: attack · on a dump: haul · on HQ: unload · engineer on derrick: capture</dd></div><div><dt>Ctrl + right click</dt><dd>Attack-move: engage anything hostile on the way (also the ATTACK-MOVE button)</dd></div><div><dt>Click neutral structure</dt><dd>Show its intel (stock, owner)</dd></div><div><dt>Production panel</dt><dd>Click builds · right-click cancels · ready structure: click, then place on the map</dd></div><div><dt>Focus panel: Q W E R · 1–9</dt><dd>Switch tab · build (Shift cancels) · Esc back to map</dd></div><div><dt>Producer selected + right click</dt><dd>Set rally point</dd></div><div><dt>Selected MCV + right click on it</dt><dd>Deploy headquarters</dd></div><div><dt>Double click</dt><dd>Select visible units of that type</dd></div><div><dt>Ctrl+0–9 / 0–9</dt><dd>Store / recall group · tap twice to centre</dd></div><div><dt>X / Esc</dt><dd>Stop selected / clear selection</dd></div><div><dt>W A S D / arrow keys</dt><dd>Pan camera · Shift for speed</dd></div><div><dt>Pointer at map edges</dt><dd>Edge scroll</dd></div><div><dt>Middle mouse drag</dt><dd>Drag the battlefield</dd></div><div><dt>Mouse wheel / + −</dt><dd>Zoom in and out</dd></div><div><dt>Click or drag minimap</dt><dd>Jump to a sector</dd></div><div><dt>Home</dt><dd>Return to starting position</dd></div><div><dt>G</dt><dd>Show tile grid</dd></div></dl>
-          <p class="guide-footnote">MILESTONE 5 · SKIRMISH AI<br>Menus, victory and saves arrive in the next milestone.</p>
+          <dl class="guide-controls"><div><dt>Left click / drag</dt><dd>Select unit / box select · Shift adds</dd></div><div><dt>Right click</dt><dd>Move · on a visible enemy: attack · on a dump: haul · on HQ: unload · engineer on derrick: capture</dd></div><div><dt>Ctrl + right click</dt><dd>Attack-move: engage anything hostile on the way (also the ATTACK-MOVE button)</dd></div><div><dt>Click neutral structure</dt><dd>Show its intel (stock, owner)</dd></div><div><dt>Production panel</dt><dd>Click builds · right-click cancels · ready structure: click, then place on the map</dd></div><div><dt>Focus panel: Q W E R · 1–9</dt><dd>Switch tab · build (Shift cancels) · Esc back to map</dd></div><div><dt>Producer selected + right click</dt><dd>Set rally point</dd></div><div><dt>Selected MCV + right click on it</dt><dd>Deploy headquarters</dd></div><div><dt>Double click</dt><dd>Select visible units of that type</dd></div><div><dt>Ctrl+0–9 / 0–9</dt><dd>Store / recall group · tap twice to centre</dd></div><div><dt>X / Esc</dt><dd>Stop selected / clear selection</dd></div><div><dt>W A S D / arrow keys</dt><dd>Pan camera · Shift for speed</dd></div><div><dt>Pointer at map edges</dt><dd>Edge scroll</dd></div><div><dt>Middle mouse drag</dt><dd>Drag the battlefield</dd></div><div><dt>Mouse wheel / + −</dt><dd>Zoom in and out</dd></div><div><dt>Click or drag minimap</dt><dd>Jump to a sector</dd></div><div><dt>Home</dt><dd>Return to starting position</dd></div><div><dt>G</dt><dd>Show tile grid</dd></div><div><dt>P / F10</dt><dd>Pause · save · load · settings</dd></div><div><dt>M</dt><dd>Mute sound</dd></div></dl>
+          <p class="guide-footnote">VICTORY: DESTROY THE ENEMY HEADQUARTERS (OR ITS MCV BEFORE IT DEPLOYS). PROTECT YOUR OWN.<br>P / F10: PAUSE MENU (SAVE, LOAD, SETTINGS) · M: MUTE</p>
           <button id="help-return" class="primary-button">RETURN TO FIELD <span aria-hidden="true">→</span></button>
+        </dialog>
+        <dialog id="main-menu" class="menu-dialog" aria-labelledby="main-menu-title">
+          <div class="guide-label">EUROPEAN THEATER · 1944</div>
+          <h2 id="main-menu-title" class="menu-title">STEEL <b>FRONT</b></h2>
+          <p>Command an Allied or Axis battle group. Deploy your headquarters, secure supply and oil, and destroy the enemy command post.</p>
+          <div class="menu-buttons">
+            <button class="primary-button" id="menu-new">NEW SKIRMISH <span aria-hidden="true">→</span></button>
+            <button class="menu-button" id="menu-continue" hidden>RETURN TO BATTLE</button>
+            <button class="menu-button" id="menu-load">LOAD GAME</button>
+            <button class="menu-button" id="menu-settings">SETTINGS</button>
+            <button class="menu-button" id="menu-controls">CONTROLS &amp; BRIEFING</button>
+          </div>
+          <details class="dev-scenarios"><summary>DEVELOPMENT SCENARIOS (TESTING)</summary>
+            <p>Milestone sandboxes for testing. They have no victory condition.</p>
+            <div class="dev-row"><select id="dev-scenario" aria-label="Development scenario"></select><button class="command-button" id="dev-start">LAUNCH</button></div>
+          </details>
+          <p class="guide-footnote">FIELD BUILD 1.0 · SINGLE PLAYER · RUNS OFFLINE</p>
+        </dialog>
+        <dialog id="skirmish-setup" class="menu-dialog wide" aria-labelledby="setup-title">
+          <div class="guide-label">NEW SKIRMISH</div><button class="guide-close" data-back aria-label="Back">×</button>
+          <h2 id="setup-title">Prepare the battle.</h2>
+          <fieldset class="choice-group"><legend>YOUR FACTION</legend><div class="choices" id="setup-factions"></div></fieldset>
+          <fieldset class="choice-group"><legend>BATTLEFIELD</legend><div class="choices" id="setup-maps"></div></fieldset>
+          <fieldset class="choice-group"><legend>COMPUTER OPPONENT</legend><div class="choices" id="setup-difficulties"></div></fieldset>
+          <p id="setup-summary" class="setup-summary"></p>
+          <div class="dialog-actions"><button class="menu-button" data-back>BACK</button><button class="primary-button" id="setup-start">START BATTLE <span aria-hidden="true">→</span></button></div>
+        </dialog>
+        <dialog id="pause-menu" class="menu-dialog" aria-labelledby="pause-title">
+          <div class="guide-label">GAME PAUSED</div>
+          <h2 id="pause-title">Field orders.</h2>
+          <p id="pause-summary"></p>
+          <div class="menu-buttons">
+            <button class="primary-button" id="pause-resume">RESUME <span aria-hidden="true">→</span></button>
+            <button class="menu-button" id="pause-results" hidden>VIEW RESULTS</button>
+            <button class="menu-button" id="pause-save">SAVE GAME</button>
+            <button class="menu-button" id="pause-load">LOAD GAME</button>
+            <button class="menu-button" id="pause-settings">SETTINGS</button>
+            <button class="menu-button" id="pause-controls">CONTROLS &amp; BRIEFING</button>
+            <button class="menu-button danger" id="pause-quit">QUIT TO MAIN MENU</button>
+          </div>
+          <p class="menu-status" id="pause-status" role="status"></p>
+        </dialog>
+        <dialog id="save-slots" class="menu-dialog" aria-labelledby="slots-title">
+          <div class="guide-label" id="slots-label">SAVE GAME</div><button class="guide-close" data-back aria-label="Back">×</button>
+          <h2 id="slots-title">Choose a slot.</h2>
+          <div class="slot-list" id="slot-list"></div>
+          <p class="menu-status" id="slots-status" role="status" aria-live="polite"></p>
+          <div class="dialog-actions"><button class="menu-button" data-back>BACK</button></div>
+        </dialog>
+        <dialog id="settings" class="menu-dialog" aria-labelledby="settings-title">
+          <div class="guide-label">SETTINGS</div><button class="guide-close" data-back aria-label="Back">×</button>
+          <h2 id="settings-title">Settings.</h2>
+          <label class="setting"><span>SOUND VOLUME</span><input type="range" id="setting-volume" min="0" max="100" step="5" aria-label="Sound volume"><output id="setting-volume-value">70%</output></label>
+          <label class="setting"><span>MUTE ALL SOUND</span><input type="checkbox" id="setting-mute" aria-label="Mute all sound"></label>
+          <label class="setting"><span>SCREEN SHAKE</span><input type="checkbox" id="setting-shake" aria-label="Screen shake"></label>
+          <p class="guide-footnote" id="setting-motion-note"></p>
+          <div class="dialog-actions"><button class="primary-button" data-back>DONE <span aria-hidden="true">→</span></button></div>
+        </dialog>
+        <dialog id="results" class="menu-dialog wide" aria-labelledby="results-title">
+          <div class="guide-label" id="results-label">BATTLE REPORT</div>
+          <h2 id="results-title">Victory.</h2>
+          <p id="results-text"></p>
+          <table class="results-table" id="results-table"></table>
+          <div class="dialog-actions"><button class="menu-button" id="results-view">VIEW BATTLEFIELD</button><button class="menu-button" id="results-menu">MAIN MENU</button><button class="primary-button" id="results-again">PLAY AGAIN <span aria-hidden="true">→</span></button></div>
         </dialog>
       </main>
       <footer class="command-bar">
@@ -60,7 +126,7 @@
         </section>
         <section class="minimap-panel" aria-label="Tactical minimap"><div class="minimap-header"><span>SECTOR OVERVIEW</span><span class="map-size">128 × 128</span></div><canvas id="minimap" aria-label="Tactical minimap. Click or drag to move the camera." tabindex="0"></canvas><span class="north-marker" aria-hidden="true">N <span>↑</span></span></section>
       </footer>
-      <div class="bottom-line"><span>STEEL FRONT <span class="bottom-line-muted">/</span> FIELD BUILD 0.6</span><span id="bottom-mode">SKIRMISH <span class="bottom-line-muted">·</span> COMPUTER OPPONENT</span><span id="map-seed">SEED —</span></div>
+      <div class="bottom-line"><span>STEEL FRONT <span class="bottom-line-muted">/</span> FIELD BUILD 1.0</span><span id="bottom-mode">SKIRMISH <span class="bottom-line-muted">·</span> COMPUTER OPPONENT</span><span id="map-seed">SEED —</span></div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

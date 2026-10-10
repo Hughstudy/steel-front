@@ -1,3 +1,4 @@
+import { LAYOUT_DEFAULTS } from './terrain.ts';
 /**
  * Typed rule definitions plus a small handwritten validator.
  * All durations are integer simulation ticks (20 per second), distances are tiles,
@@ -66,6 +67,17 @@ export interface ScenarioDef {
   resources: boolean;
   /** Fog of war and shroud (default on). */
   fog: boolean;
+  /** Objective rule active: losing the MCV (before deployment) or HQ ends a player's match. */
+  victory: boolean;
+}
+
+/** Normal-match setup: starting forces per faction and the selectable maps. */
+export interface SkirmishRules {
+  credits: number;
+  maps: string[];
+  defaultMap: string;
+  defaultFaction: string;
+  start: Map<string, ScenarioUnitGroup[]>;
 }
 
 export interface BuildingCapabilities {
@@ -115,7 +127,10 @@ export interface EconomyRules {
 
 export interface MapPoint { x: number; y: number }
 export interface MapPreset {
-  id: string; name: string; seed: number; spawns: MapPoint[]; supplies: MapPoint[]; derricks: MapPoint[];
+  id: string; name: string; subtitle: string; seed: number; spawns: MapPoint[]; supplies: MapPoint[]; derricks: MapPoint[];
+  /** Overrides merged over the base map config's generator settings and palette. */
+  generation: Record<string, unknown>;
+  palette: Record<string, string>;
   /** Building types placed at the supply and derrick points. */
   supplyType: string; derrickType: string;
 }
@@ -124,7 +139,7 @@ export interface MapPreset {
 export interface AiFactionPlan {
   power: string; truck: string; engineer: string;
   /** Ordered base plan: cumulative target counts, optionally not before a (tempo-scaled) tick. */
-  base: Array<{ type: string; count: number; afterTick: number }>;
+  base: Array<{ type: string; count: number; afterTick: number; minCredits: number }>;
   /** Relative army composition weights. */
   army: Array<{ type: string; weight: number }>;
 }
@@ -158,12 +173,22 @@ export interface Rules {
   maps: Map<string, MapPreset>;
   scenarios: Map<string, ScenarioDef>;
   ai: AiRules;
+  skirmish: SkirmishRules;
+  /** Content hash of the raw data; saves only load against identical rules. */
+  hash: string;
 }
 
 export interface RawRules {
   game: unknown; terrain: unknown; factions: unknown; units: unknown; scenarios: unknown;
   buildings: unknown; economy: unknown; maps: unknown; production: unknown;
-  weapons: unknown; combat: unknown; ai: unknown;
+  weapons: unknown; combat: unknown; ai: unknown; skirmish: unknown;
+}
+
+/** FNV-1a (32-bit) over a string, as 8 hex digits. */
+export function hashText(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 0x01000193);
+  return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
 /** Owner faction id used for neutral map objects. */
@@ -533,8 +558,14 @@ export function loadRules(raw: RawRules): Rules {
   check.array(raw.maps, 'maps').forEach((item, index) => {
     const r = check.object(item, `maps[${index}]`);
     const where = `maps[${typeof r.id === 'string' ? r.id : index}]`;
+    const generation = check.object(r.generation ?? {}, `${where}.generation`);
+    for (const key of Object.keys(generation)) if (!(key in LAYOUT_DEFAULTS)) check.errors.push(`${where}.generation.${key}: unknown generator setting`);
+    const palette = check.object(r.palette ?? {}, `${where}.palette`);
+    for (const [key, value] of Object.entries(palette)) if (typeof value !== 'string' || !/^#[0-9a-f]{6}$/i.test(value)) check.errors.push(`${where}.palette.${key}: expected a #rrggbb colour`);
     const preset: MapPreset = {
-      id: check.string(r, 'id', where), name: check.string(r, 'name', where), seed: check.number(r, 'seed', where, 0, 2 ** 31, true),
+      id: check.string(r, 'id', where), name: check.string(r, 'name', where), subtitle: check.string(r, 'subtitle', where),
+      seed: check.number(r, 'seed', where, 0, 2 ** 31, true),
+      generation, palette: palette as Record<string, string>,
       spawns: points(r.spawns, `${where}.spawns`), supplies: points(r.supplies, `${where}.supplies`), derricks: points(r.derricks, `${where}.derricks`),
       supplyType: check.string(r, 'supplyType', where), derrickType: check.string(r, 'derrickType', where),
     };
@@ -589,7 +620,8 @@ export function loadRules(raw: RawRules): Rules {
         const type = check.string(br, 'type', bw);
         const def = buildings.get(type);
         if (!def || def.faction !== faction || def.producer === null) check.errors.push(`${bw}.type: ${type} is not a buildable ${faction} structure`);
-        return { type, count: check.number(br, 'count', bw, 1, 50, true), afterTick: br.afterTick === undefined ? 0 : check.number(br, 'afterTick', bw, 0, 1e7, true) };
+        return { type, count: check.number(br, 'count', bw, 1, 50, true), afterTick: br.afterTick === undefined ? 0 : check.number(br, 'afterTick', bw, 0, 1e7, true),
+          minCredits: br.minCredits === undefined ? 0 : check.number(br, 'minCredits', bw, 0, 1e6, true) };
       }),
       army: Object.entries(check.object(r.army, `${where}.army`)).map(([type, weight]) => {
         const def = units.get(type);
@@ -609,7 +641,7 @@ export function loadRules(raw: RawRules): Rules {
     const camera = check.object(r.camera, `${where}.camera`);
     const def: ScenarioDef = {
       id: check.string(r, 'id', where), name: check.string(r, 'name', where), description: check.string(r, 'description', where),
-      map: check.string(r, 'map', where), resources: r.resources === true, fog: r.fog !== false,
+      map: check.string(r, 'map', where), resources: r.resources === true, fog: r.fog !== false, victory: r.victory === true,
       camera: { x: check.number(camera, 'x', `${where}.camera`, 0, 1023), y: check.number(camera, 'y', `${where}.camera`, 0, 1023) },
       players: check.array(r.players, `${where}.players`).map((p, pi) => {
         const pw = `${where}.players[${pi}]`;
@@ -646,6 +678,34 @@ export function loadRules(raw: RawRules): Rules {
     scenarios.set(def.id, def);
   });
 
+  const sk = check.object(raw.skirmish, 'skirmish');
+  const start = new Map<string, ScenarioUnitGroup[]>();
+  for (const [faction, value] of Object.entries(check.object(sk.start, 'skirmish.start'))) {
+    const where = `skirmish.start.${faction}`;
+    if (!factions.has(faction)) check.errors.push(`${where}: unknown faction`);
+    if (!aiFactions.has(faction)) check.errors.push(`${where}: no AI plan for this faction`);
+    start.set(faction, check.array(value, where).map((u, ui) => {
+      const ur = check.object(u, `${where}[${ui}]`);
+      const type = check.string(ur, 'type', `${where}[${ui}]`);
+      if (units.get(type)?.faction !== faction) check.errors.push(`${where}[${ui}].type: ${type} is not a ${faction} unit`);
+      return { type, count: check.number(ur, 'count', `${where}[${ui}]`, 1, 50, true) };
+    }));
+    if (!start.get(faction)!.some(g => typeof units.get(g.type)?.capabilities.deploy === 'string')) check.errors.push(`${where}: needs a deployable unit (MCV) as the starting objective`);
+  }
+  for (const faction of factions.keys()) if (!start.has(faction)) check.errors.push(`skirmish.start: missing faction ${faction}`);
+  const skirmish: SkirmishRules = {
+    credits: check.number(sk, 'credits', 'skirmish', 0, 1_000_000, true),
+    maps: check.strings(sk, 'maps', 'skirmish'),
+    defaultMap: check.string(sk, 'defaultMap', 'skirmish'),
+    defaultFaction: check.string(sk, 'defaultFaction', 'skirmish'),
+    start,
+  };
+  for (const id of skirmish.maps) if (!maps.has(id)) check.errors.push(`skirmish.maps: unknown map ${id}`);
+  if (!skirmish.maps.includes(skirmish.defaultMap)) check.errors.push(`skirmish.defaultMap: ${skirmish.defaultMap} is not a listed map`);
+  if (!start.has(skirmish.defaultFaction)) check.errors.push(`skirmish.defaultFaction: unknown faction ${skirmish.defaultFaction}`);
+
   if (check.errors.length) throw new RulesError(check.errors);
-  return { game, terrain, factions, units, buildings, economy, production, weapons, combat, maps, scenarios, ai };
+  const record = raw as unknown as Record<string, unknown>;
+  const hash = hashText(JSON.stringify(Object.keys(record).sort().map(key => [key, record[key]])));
+  return { game, terrain, factions, units, buildings, economy, production, weapons, combat, maps, scenarios, ai, skirmish, hash };
 }

@@ -245,7 +245,7 @@ export function updateProduction(world: World): void {
         if (item.work < item.total) continue;
       }
       if (category.placement) { item.reason = 'ready'; continue; }
-      if (spawnProduced(world, player.index, item)) queue.shift();
+      if (spawnProduced(world, player.index, item)) { queue.shift(); player.stats.unitsBuilt++; }
       else item.reason = hasProducer(world, player.index, category.id) ? 'exit-blocked' : 'no-producer';
     }
   }
@@ -357,6 +357,7 @@ function updatePending(world: World): void {
     }
     world.pending.splice(i--, 1);
     world.spawnBuilding(pending.type, pending.player, pending.origin);
+    player.stats.buildingsBuilt++;
   }
 }
 

@@ -42,6 +42,9 @@ export class Selection {
     if (changed) this.version++;
   }
 
+  /** Forget selection and control groups (entity ids are per match). */
+  reset(): void { this.ids.clear(); this.groups.clear(); this.version++; }
+
   list(): number[] { return Array.from(this.ids).sort((a, b) => a - b); }
 
   storeGroup(slot: number): void { this.groups.set(slot, this.list()); }
