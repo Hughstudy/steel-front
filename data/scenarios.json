@@ -1,5 +1,48 @@
 [
   {
+    "id": "m5-skirmish",
+    "name": "Skirmish vs AI",
+    "description": "Deploy your MCV, build up and destroy the computer-controlled Axis base across the river.",
+    "map": "lowlands",
+    "camera": {
+      "x": 20,
+      "y": 46
+    },
+    "fog": true,
+    "resources": true,
+    "players": [
+      {
+        "faction": "allies",
+        "credits": 5000,
+        "anchor": {
+          "x": 20,
+          "y": 46
+        },
+        "units": [
+          {
+            "type": "allied_mcv",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "faction": "axis",
+        "credits": 5000,
+        "anchor": {
+          "x": 106,
+          "y": 66
+        },
+        "units": [
+          {
+            "type": "axis_mcv",
+            "count": 1
+          }
+        ],
+        "ai": "normal"
+      }
+    ]
+  },
+  {
     "id": "m4-combat",
     "name": "Combat Sandbox",
     "description": "Your battle group and base face an entrenched Axis force across the river. Use AT guns against armour, MGs against infantry, artillery from range and fighters for air cover.",

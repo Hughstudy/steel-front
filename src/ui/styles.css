@@ -172,7 +172,7 @@ dialog p{color:#c0ccb2;font-size:12px;line-height:1.7}
 .selection-info p{font-family:'Courier New',monospace;font-size:10px;color:#cfd6b9;margin:7px 0 6px;min-height:13px}
 .hp-bar{height:5px;background:#18221a;border:1px solid #6b7656;max-width:190px}
 .hp-bar i{display:block;height:100%;width:100%;background:#9fd36b}
-.selection-types{display:flex;flex-wrap:wrap;gap:4px;max-height:38px;overflow:hidden}
+.selection-types{display:flex;flex-wrap:wrap;gap:4px;max-height:19px;overflow:hidden}
 .selection-types button{font-size:9px;padding:2px 5px;border:1px solid #6e7a58;background:#36412f;color:#e0dcc0;font-family:'Courier New',monospace}
 .command-buttons{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
 .command-button{border:1px solid #8a8a62;background:#3c4834;color:#ece3bb;font-size:9px;font-weight:bold;letter-spacing:1.1px;padding:7px 10px}
@@ -190,8 +190,8 @@ dialog p{color:#c0ccb2;font-size:12px;line-height:1.7}
 .scenario-picker{display:flex;align-items:center;gap:8px}
 .scenario-picker select{background:#2c3829;color:#e2d3a4;border:1px solid #6d7655;font:bold 10px Arial,sans-serif;letter-spacing:.6px;padding:4px 6px;max-width:170px}
 #power.is-low{color:#ef8b62}
-.selection-actions{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
-.selection-actions .command-button{padding:4px 7px}
+.selection-actions{display:flex;gap:4px;margin-top:6px;flex-wrap:nowrap}
+.selection-actions .command-button{padding:4px 5px;letter-spacing:.4px;white-space:nowrap}
 .production-panel{align-self:stretch;display:flex;flex-direction:column;gap:6px;min-width:0;outline:none;padding:0 4px}
 .production-panel:focus-visible,.production-panel:focus-within{box-shadow:inset 0 0 0 1px #e9d69c66}
 .production-head{display:flex;align-items:center;gap:8px;min-width:0}
@@ -225,3 +225,4 @@ dialog p{color:#c0ccb2;font-size:12px;line-height:1.7}
 .production-hint{color:#8b9475;margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:800px){.operation-panel.production-panel{display:flex}.command-bar{grid-template-columns:minmax(0,1fr) 150px}.info-slot{display:none}.production-hint,.production-focus{display:none}.scenario-picker .resource-label{display:none}}
 #battlefield.cursor-attack{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cg fill='none' stroke='%23180c08' stroke-width='4'%3E%3Ccircle cx='12' cy='12' r='7'/%3E%3Cpath d='M12 1v6M12 17v6M1 12h6M17 12h6'/%3E%3C/g%3E%3Cg fill='none' stroke='%23ff5a3c' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='7'/%3E%3Cpath d='M12 1v6M12 17v6M1 12h6M17 12h6'/%3E%3C/g%3E%3C/svg%3E") 12 12,crosshair}
+.scenario-picker[hidden]{display:none}

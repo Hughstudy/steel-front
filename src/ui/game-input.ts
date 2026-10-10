@@ -10,7 +10,8 @@ export interface GameInputHost {
   player(): number;
   world(): World;
   /** Right-click on ground/entity with the given tile (floating centre coordinates). */
-  order(tileX: number, tileY: number, target: Entity | null, queue: boolean): void;
+  /** Right-click order; `attackMove` when Ctrl/⌘ is held. */
+  order(tileX: number, tileY: number, target: Entity | null, queue: boolean, attackMove: boolean): void;
   stop(): void;
   centerOn(ids: number[]): void;
   /** Returns true if the host consumed the click (e.g. building placement). */
@@ -88,7 +89,7 @@ export class GameInput {
     if (event.button === 2) {
       event.preventDefault();
       if (this.host.cancelAction?.()) return;
-      this.issueOrder(event.shiftKey);
+      this.issueOrder(event.shiftKey, event.ctrlKey || event.metaKey);
       return;
     }
     if (event.button !== 0) return;
@@ -170,12 +171,12 @@ export class GameInput {
     else this.selection.clear();
   }
 
-  private issueOrder(queue: boolean): void {
+  private issueOrder(queue: boolean, attackMove = false): void {
     if (this.selection.ids.size === 0) return;
     const tile = this.tileAtPointer();
     this.camera.screenToWorld(this.pointerX, this.pointerY, this.scratch);
     const target = this.layer.pick(this.scratch.x, this.scratch.y, () => true);
-    this.host.order(tile.x, tile.y, target, queue);
+    this.host.order(tile.x, tile.y, target, queue, attackMove);
   }
 
   private key = (event: KeyboardEvent): void => {

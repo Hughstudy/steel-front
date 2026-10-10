@@ -131,6 +131,7 @@ function updateShooter(world: World, unit: Entity, def: UnitDef): void {
   const air = def.movement === 'air';
   unit.setup = !air && moving(unit) ? 0 : unit.setup + 1;
 
+  if (unit.amove >= 0 && unit.attack < 0) attackMove(world, unit, def, air);
   // Explicit orders persist while the target is valid and visible.
   let target = validTarget(world, unit, def, unit.attack);
   if (!target && unit.attack >= 0) { unit.attack = -1; }
@@ -187,6 +188,51 @@ function updateShooter(world: World, unit: Entity, def: UnitDef): void {
     unit.cooldowns[i] = Math.max(1, Math.floor(weapon.reloadTicks * (100 - combat.veterancy.reloadPercent[unit.rank]) / 100));
     world.events.push({ kind: 'fire', x: unit.x, y: unit.y, a: bearing, weapon: weapon.id, id: unit.id });
   }
+}
+
+/**
+ * Attack-move: look for the nearest visible hostile within sight (units before
+ * structures) and engage it as an ordered target; otherwise resume toward the
+ * destination. Re-routing is rate-limited, and the order ends on arrival.
+ */
+function attackMove(world: World, unit: Entity, def: UnitDef, air: boolean): void {
+  const resuming = unit.goal !== unit.amove;
+  if (resuming || (world.tick + unit.id) % world.rules.combat.acquireIntervalTicks === 0) {
+    const found = sighted(world, unit, def);
+    if (found >= 0) {
+      unit.attack = found;
+      unit.aim = found;
+      unit.chaseTick = -1000000;
+      return;
+    }
+  }
+  const w = world.nav.width;
+  if (air) {
+    if (unit.goal !== unit.amove) unit.goal = unit.amove;
+    else if (unit.moveState === MoveState.Arrived) unit.amove = -1;
+    return;
+  }
+  if (moving(unit)) return;
+  const near = Math.max(Math.abs(unit.tile % w - unit.amove % w), Math.abs(((unit.tile / w) | 0) - ((unit.amove / w) | 0))) <= 2;
+  if (near || unit.moveState === MoveState.Unreachable) { unit.amove = -1; return; }
+  if (world.tick - unit.chaseTick < world.rules.combat.chaseRepathTicks) return;
+  unit.chaseTick = world.tick;
+  const goal = unit.amove;
+  world.moveUnitTo(unit, goal);
+  unit.amove = goal;
+}
+
+/** Nearest visible hostile the unit can hurt within its sight: units first, then structures. */
+function sighted(world: World, unit: Entity, def: UnitDef): number {
+  const s = world.subTile;
+  let best = -1;
+  let bestRank = Infinity;
+  world.grid.query(world, unit.x, unit.y, Math.max(maxRange(world, def), def.vision * s), (other, d2) => {
+    if (!hostile(unit, other) || !canSee(world, unit.owner, other) || !engageable(world, def, other)) return;
+    const rank = (other.kind === 'unit' ? 0 : 1e15) + d2 * 1e5 + other.id;
+    if (rank < bestRank) { bestRank = rank; best = other.id; }
+  });
+  return best;
 }
 
 /** Close to weapon range of an ordered target, re-routing as it moves; halt once in range. */

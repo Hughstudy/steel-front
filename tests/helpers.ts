@@ -21,7 +21,7 @@ export function rawRules(): Record<string, unknown> {
     game: readJson('game'), terrain: readJson('terrain'), factions: readJson('factions'),
     units: readJson('units'), scenarios: readJson('scenarios'),
     buildings: readJson('buildings'), economy: readJson('economy'), maps: readJson('maps'), production: readJson('production'),
-    weapons: readJson('weapons'), combat: readJson('combat'),
+    weapons: readJson('weapons'), combat: readJson('combat'), ai: readJson('ai'),
   };
 }
 

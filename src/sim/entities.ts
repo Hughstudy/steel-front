@@ -95,6 +95,8 @@ export interface Entity {
   killer: number;
   /** Most recent attacker, for retaliation (-1 none). */
   attacker: number;
+  /** Attack-move destination tile (-1 none): engage anything hostile in sight on the way. */
+  amove: number;
 }
 
 export function createEntity(id: number, kind: EntityKind, type: string, owner: number, hp: number): Entity {
@@ -106,6 +108,6 @@ export function createEntity(id: number, kind: EntityKind, type: string, owner: 
     moveState: MoveState.Idle, reason: '', blocked: 0, waitTotal: 0, lastProgress: 0,
     yieldPath: null, yieldIndex: 0, yieldAvoid: null, resume: false, repath: 0, odometer: 0,
     cargo: 0, stock: 0, task: '', target: -1, preferred: -1, timer: 0, status: '', auto: false, docks: null, rally: -1, repairing: false,
-    cooldowns: [], attack: -1, aim: -1, setup: 0, chaseTick: 0, xp: 0, rank: 0, killer: -1, attacker: -1,
+    cooldowns: [], attack: -1, aim: -1, setup: 0, chaseTick: 0, xp: 0, rank: 0, killer: -1, attacker: -1, amove: -1,
   };
 }

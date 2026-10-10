@@ -4,7 +4,7 @@ import type { ConstructionProblem } from '../sim/production.ts';
 import type { BuildingDef } from '../sim/rules.ts';
 import type { World } from '../sim/world.ts';
 
-export type HudMode = '' | 'place' | 'sell' | 'repair';
+export type HudMode = '' | 'place' | 'sell' | 'repair' | 'amove';
 
 const PROBLEM_TEXT: Record<string, string> = {
   bounds: 'too close to the map edge',

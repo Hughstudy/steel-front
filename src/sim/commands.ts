@@ -3,7 +3,7 @@
  * the world validates ownership/targets when the command executes.
  */
 export type CommandKind = 'move' | 'stop' | 'harvest' | 'deposit' | 'capture'
-  | 'build' | 'cancel' | 'place' | 'deploy' | 'sell' | 'repair' | 'rally' | 'attack';
+  | 'build' | 'cancel' | 'place' | 'deploy' | 'sell' | 'repair' | 'rally' | 'attack' | 'amove';
 
 export interface CommandInput {
   player: number;

@@ -1,6 +1,6 @@
 # Steel Front
 
-WW2-themed, isometric browser RTS. **Current milestone: M4 — combat & fog**. Command a mixed WWII battle group against an entrenched Axis force under fog of war. Supply trucks and oil fund production (M2), and an MCV deploys into a base with a tech tree (M3). Pick scenarios from the top-right selector. Computer opponents arrive in M5.
+WW2-themed, isometric browser RTS. **Current milestone: M5 — skirmish AI**. Deploy your MCV, build a base and fight a computer-controlled Axis opponent (Recruit / Regular / Veteran) under fog of war. Supply trucks and oil fund production, and combat uses data-driven weapons and armour. Pick scenarios and difficulty in the top bar.
 
 Requires Node.js 22.12+ (tested with Node 26) and npm.
 
@@ -13,7 +13,7 @@ npm run build
 
 Open the URL printed by Vite. `npm run preview` serves the production build locally.
 
-Controls: left click / drag to select (Shift adds), double-click selects a type, right-click moves or attacks a visible enemy, Ctrl+0–9 / 0–9 groups, X stops. WASD / arrows or map-edge scroll to pan, Shift for faster pan, mouse wheel or +/− to zoom, middle mouse drag to pan, minimap click/drag to jump, Home / Space to return to the starting sector, G to toggle tile grid. Controls are also available in the HUD.
+Controls: left click / drag to select (Shift adds), double-click selects a type, right-click moves or attacks a visible enemy, Ctrl/⌘+right-click attack-moves, Ctrl+0–9 / 0–9 groups, X stops. WASD / arrows or map-edge scroll to pan, Shift for faster pan, mouse wheel or +/− to zoom, middle mouse drag to pan, minimap click/drag to jump, Home / Space to return to the starting sector, G to toggle tile grid. Controls are also available in the HUD.
 
 The seeded map contains 16,384 tiles. Terrain generation is deterministic. The renderer caches ground chunks, culls offscreen terrain/scenery, and reuses scenery sprites; simulation ticks at 20 Hz separately from rendering.
 

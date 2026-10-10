@@ -10,6 +10,7 @@ import mapPresetData from '../data/maps.json';
 import productionData from '../data/production.json';
 import weaponData from '../data/weapons.json';
 import combatData from '../data/combat.json';
+import aiData from '../data/ai.json';
 import type { MapConfig } from './types.ts';
 import { Camera } from './engine/camera.ts';
 import { CameraInput } from './engine/input.ts';
@@ -39,7 +40,7 @@ const config: MapConfig = mapData;
 const rules = loadRules({
   game: gameData, terrain: terrainData, factions: factionData, units: unitData, scenarios: scenarioData,
   buildings: buildingData, economy: economyData, maps: mapPresetData, production: productionData,
-  weapons: weaponData, combat: combatData,
+  weapons: weaponData, combat: combatData, ai: aiData,
 });
 const canvas = document.querySelector<HTMLCanvasElement>('#battlefield')!;
 const viewport = document.querySelector<HTMLElement>('#viewport')!;
@@ -55,7 +56,8 @@ const scenarioSelect = document.querySelector<HTMLSelectElement>('#scenario-sele
 const selection = new Selection();
 const PLAYER = 0;
 let world = new World(rules, map, config.seed);
-let scenarioId = 'm4-combat';
+let scenarioId = 'm5-skirmish';
+const difficultySelect = document.querySelector<HTMLSelectElement>('#difficulty-select')!;
 /** Entity shown in the panel when nothing is selected (live entity id or a memory ghost). */
 let inspected: Entity | null = null;
 let showGrid = false;
@@ -66,7 +68,8 @@ function startScenario(id: string): void {
   const scenario = rules.scenarios.get(id)!;
   scenarioId = id;
   world = new World(rules, map, config.seed);
-  world.loadScenario(scenario);
+  world.loadScenario(scenario, { difficulty: difficultySelect.value || rules.ai.defaultDifficulty });
+  document.getElementById('difficulty-picker')!.hidden = !scenario.players.some(p => p.ai);
   layer.warm(world);
   fogLayer.reset();
   ghosts.clear();
@@ -138,6 +141,7 @@ function setMode(mode: HudMode, type = ''): void {
   placement.start(mode, type);
   document.getElementById('mode-sell')!.setAttribute('aria-pressed', String(mode === 'sell'));
   document.getElementById('mode-repair')!.setAttribute('aria-pressed', String(mode === 'repair'));
+  document.getElementById('action-amove')!.setAttribute('aria-pressed', String(mode === 'amove'));
 }
 
 /** Units in the selection (buildings are selectable too, but take different orders). */
@@ -168,6 +172,15 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
       setMode('');
       return true;
     }
+    if (placement.mode === 'amove') {
+      const ids = selectedUnits();
+      if (ids.length) {
+        world.enqueue({ player: PLAYER, kind: 'amove', ids, x: Math.floor(tileX), y: Math.floor(tileY) });
+        markers.add(tileX, tileY, 'attack', presentationTime);
+      }
+      setMode('');
+      return true;
+    }
     if (placement.mode === 'sell' || placement.mode === 'repair') {
       const target = gameInput.hovered();
       if (target && target.kind === 'building' && target.owner === PLAYER) {
@@ -179,7 +192,7 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
     return false;
   },
   cancelAction: () => { const active = placement.mode !== ''; setMode(''); return active; },
-  order: (tileX, tileY, target) => {
+  order: (tileX, tileY, target, _queue, attackMove) => {
     const all = selection.list();
     const ids = selectedUnits();
     const x = Math.floor(tileX);
@@ -198,6 +211,11 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
     if (target && target.owner === PLAYER && target.kind === 'unit' && selection.ids.has(target.id)
       && typeof rules.units.get(target.type)?.capabilities.deploy === 'string') {
       deploySelected();
+      return;
+    }
+    if (attackMove && world.nav.inBounds(x, y)) {
+      world.enqueue({ player: PLAYER, kind: 'amove', ids, x, y });
+      markers.add(tileX, tileY, 'attack', presentationTime);
       return;
     }
     // Unseen or remembered targets take a plain move order (no hidden information).
@@ -235,12 +253,16 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
 });
 
 for (const scenario of rules.scenarios.values()) scenarioSelect.add(new Option(scenario.name, scenario.id));
+for (const level of rules.ai.difficulties.values()) difficultySelect.add(new Option(level.name, level.id));
+difficultySelect.value = rules.ai.defaultDifficulty;
+difficultySelect.addEventListener('change', () => { startScenario(scenarioId); canvas.focus(); });
 scenarioSelect.addEventListener('change', () => { startScenario(scenarioSelect.value); canvas.focus(); });
 document.getElementById('action-haul')!.addEventListener('click', () => {
   const ids = selectedUnits();
   if (ids.length) world.enqueue({ player: PLAYER, kind: 'harvest', ids, x: 0, y: 0 });
 });
 document.getElementById('action-stop')!.addEventListener('click', stopSelected);
+document.getElementById('action-amove')!.addEventListener('click', () => setMode(placement.mode === 'amove' ? '' : 'amove'));
 document.getElementById('action-deploy')!.addEventListener('click', deploySelected);
 document.getElementById('mode-sell')!.addEventListener('click', () => setMode(placement.mode === 'sell' ? '' : 'sell'));
 document.getElementById('mode-repair')!.addEventListener('click', () => setMode(placement.mode === 'repair' ? '' : 'repair'));
@@ -307,6 +329,7 @@ function updateCursor(hovered: Entity | null): void {
   const context = units.length > 0 ? contextOrder(world, PLAYER, units, target) : 'move';
   const ownBuilding = hovered && hovered.kind === 'building' && hovered.owner === PLAYER ? rules.buildings.get(hovered.type)! : null;
   if (placement.mode === 'place') cursor = 'cursor-place';
+  else if (placement.mode === 'amove') cursor = 'cursor-attack';
   else if (placement.mode === 'sell') cursor = ownBuilding?.sellable ? 'cursor-sell' : 'cursor-invalid';
   else if (placement.mode === 'repair') cursor = ownBuilding && hovered!.hp < ownBuilding.hp ? 'cursor-repair' : 'cursor-invalid';
   else if (hovered && selection.ids.has(hovered.id) && typeof rules.units.get(hovered.type)?.capabilities.deploy === 'string') cursor = 'cursor-deploy';
@@ -358,6 +381,7 @@ const powerLabel = document.getElementById('power')!;
 const deployButton = document.getElementById('action-deploy')!;
 const haulButton = document.getElementById('action-haul')!;
 const stopButton = document.getElementById('action-stop')!;
+const amoveButton = document.getElementById('action-amove')!;
 function updateHud(): void {
   const player = world.players[PLAYER];
   funds.textContent = String(player?.credits ?? 0);
@@ -370,6 +394,7 @@ function updateHud(): void {
   deployButton.hidden = !units.some(u => typeof rules.units.get(u.type)?.capabilities.deploy === 'string');
   haulButton.hidden = !units.some(u => typeof rules.units.get(u.type)?.capabilities.cargo === 'number');
   stopButton.hidden = units.length === 0;
+  amoveButton.hidden = !units.some(u => rules.units.get(u.type)!.weapons.length > 0);
   production.update();
 }
 
@@ -480,7 +505,9 @@ function advance(ticks: number): number {
 }
 
 // Debug/QA hook for measuring in the browser without affecting the simulation.
-(window as unknown as { steelFront: unknown }).steelFront = { get world() { return world; }, camera, selection, layer, benchmark, startScenario, advance, placement, effects, fogLayer,
+(window as unknown as { steelFront: unknown }).steelFront = { get world() { return world; },
+  /** Development diagnostics: computer players' recent decisions and waves (not shown in the player HUD). */
+  ai: () => world.players.filter(p => p.ai).map(p => ({ player: p.index, difficulty: p.ai!.difficulty, waves: p.ai!.waves, log: p.ai!.log.slice(-20) })), camera, selection, layer, benchmark, startScenario, advance, placement, effects, fogLayer,
   render: () => { lastPanel = 0; renderFrame(1, 0); },
   /** Page coordinates of an entity's ground point, for driving real pointer input in QA. */
   screenOf: (id: number) => {

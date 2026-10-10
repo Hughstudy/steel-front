@@ -56,6 +56,8 @@ export interface ScenarioBuilding { type: string; spawn: number }
 export interface ScenarioPlayer {
   faction: string; credits: number; anchor: { x: number; y: number }; units: ScenarioUnitGroup[];
   buildings: ScenarioBuilding[];
+  /** Computer-controlled with this difficulty id ('' = human/scripted). */
+  ai: string;
 }
 export interface ScenarioDef {
   id: string; name: string; description: string; map: string;
@@ -118,6 +120,31 @@ export interface MapPreset {
   supplyType: string; derrickType: string;
 }
 
+/** Computer opponent plan for one faction (types are data ids). */
+export interface AiFactionPlan {
+  power: string; truck: string; engineer: string;
+  /** Ordered base plan: cumulative target counts, optionally not before a (tempo-scaled) tick. */
+  base: Array<{ type: string; count: number; afterTick: number }>;
+  /** Relative army composition weights. */
+  army: Array<{ type: string; weight: number }>;
+}
+
+/** Difficulty knobs: economy, tempo and composition, never combat cheats. */
+export interface AiDifficulty {
+  id: string; name: string;
+  thinkIntervalTicks: number; actionsPerThink: number; tempoPercent: number;
+  truckTarget: number; engineerTarget: number; queueDepth: number; armyCap: number;
+  firstWaveTick: number; waveIntervalTicks: number; waveStartSize: number; waveGrowth: number; waveMaxSize: number;
+  defenseReserve: number; defenseRadius: number; defenseCalmTicks: number;
+  powerMargin: number; placementTries: number; retryTicks: number; bankruptcyRetryTicks: number;
+}
+
+export interface AiRules {
+  factions: Map<string, AiFactionPlan>;
+  difficulties: Map<string, AiDifficulty>;
+  defaultDifficulty: string;
+}
+
 export interface Rules {
   game: GameRules;
   terrain: TerrainRules;
@@ -130,12 +157,13 @@ export interface Rules {
   combat: CombatRules;
   maps: Map<string, MapPreset>;
   scenarios: Map<string, ScenarioDef>;
+  ai: AiRules;
 }
 
 export interface RawRules {
   game: unknown; terrain: unknown; factions: unknown; units: unknown; scenarios: unknown;
   buildings: unknown; economy: unknown; maps: unknown; production: unknown;
-  weapons: unknown; combat: unknown;
+  weapons: unknown; combat: unknown; ai: unknown;
 }
 
 /** Owner faction id used for neutral map objects. */
@@ -517,6 +545,63 @@ export function loadRules(raw: RawRules): Rules {
     maps.set(preset.id, preset);
   });
 
+  const a = check.object(raw.ai, 'ai');
+  const difficulties = new Map<string, AiDifficulty>();
+  check.array(a.difficulties, 'ai.difficulties').forEach((item, index) => {
+    const r = check.object(item, `ai.difficulties[${index}]`);
+    const where = `ai.difficulties[${typeof r.id === 'string' ? r.id : index}]`;
+    const int = (key: string, min: number, max: number): number => check.number(r, key, where, min, max, true);
+    const def: AiDifficulty = {
+      id: check.string(r, 'id', where), name: check.string(r, 'name', where),
+      thinkIntervalTicks: int('thinkIntervalTicks', 1, 1000), actionsPerThink: int('actionsPerThink', 1, 100), tempoPercent: int('tempoPercent', 1, 1000),
+      truckTarget: int('truckTarget', 0, 50), engineerTarget: int('engineerTarget', 0, 50), queueDepth: int('queueDepth', 1, 20), armyCap: int('armyCap', 0, 1000),
+      firstWaveTick: int('firstWaveTick', 0, 1e7), waveIntervalTicks: int('waveIntervalTicks', 1, 1e7), waveStartSize: int('waveStartSize', 1, 500),
+      waveGrowth: int('waveGrowth', 0, 500), waveMaxSize: int('waveMaxSize', 1, 500),
+      defenseReserve: int('defenseReserve', 0, 500), defenseRadius: int('defenseRadius', 1, 128), defenseCalmTicks: int('defenseCalmTicks', 1, 1e6),
+      powerMargin: int('powerMargin', 0, 10000), placementTries: int('placementTries', 1, 10000), retryTicks: int('retryTicks', 1, 1e6),
+      bankruptcyRetryTicks: int('bankruptcyRetryTicks', 1, 1e7),
+    };
+    if (def.waveMaxSize < def.waveStartSize) check.errors.push(`${where}: waveMaxSize below waveStartSize`);
+    if (difficulties.has(def.id)) check.errors.push(`${where}: duplicate difficulty ${def.id}`);
+    difficulties.set(def.id, def);
+  });
+  const defaultDifficulty = check.string(a, 'defaultDifficulty', 'ai');
+  if (!difficulties.has(defaultDifficulty)) check.errors.push(`ai.defaultDifficulty: unknown difficulty ${defaultDifficulty}`);
+  const aiFactions = new Map<string, AiFactionPlan>();
+  const planned = check.object(a.factions, 'ai.factions');
+  for (const [faction, value] of Object.entries(planned)) {
+    const where = `ai.factions.${faction}`;
+    if (!factions.has(faction)) check.errors.push(`${where}: unknown faction`);
+    const r = check.object(value, where);
+    const unitOf = (key: string, capability: string): string => {
+      const type = check.string(r, key, where);
+      const def = units.get(type);
+      if (!def || def.faction !== faction || (capability && def.capabilities[capability] === undefined)) check.errors.push(`${where}.${key}: ${type} is not a ${faction} unit with ${capability}`);
+      return type;
+    };
+    const power = check.string(r, 'power', where);
+    if ((buildings.get(power)?.power ?? 0) <= 0) check.errors.push(`${where}.power: ${power} does not supply power`);
+    const plan: AiFactionPlan = {
+      power, truck: unitOf('truck', 'cargo'), engineer: unitOf('engineer', 'capture'),
+      base: check.array(r.base, `${where}.base`).map((b, i) => {
+        const bw = `${where}.base[${i}]`;
+        const br = check.object(b, bw);
+        const type = check.string(br, 'type', bw);
+        const def = buildings.get(type);
+        if (!def || def.faction !== faction || def.producer === null) check.errors.push(`${bw}.type: ${type} is not a buildable ${faction} structure`);
+        return { type, count: check.number(br, 'count', bw, 1, 50, true), afterTick: br.afterTick === undefined ? 0 : check.number(br, 'afterTick', bw, 0, 1e7, true) };
+      }),
+      army: Object.entries(check.object(r.army, `${where}.army`)).map(([type, weight]) => {
+        const def = units.get(type);
+        if (!def || def.faction !== faction || def.producer === null || def.weapons.length === 0) check.errors.push(`${where}.army.${type}: not a producible armed ${faction} unit`);
+        if (typeof weight !== 'number' || !Number.isInteger(weight) || weight < 1 || weight > 1000) check.errors.push(`${where}.army.${type}: expected an integer weight in [1, 1000]`);
+        return { type, weight: typeof weight === 'number' ? weight : 1 };
+      }),
+    };
+    aiFactions.set(faction, plan);
+  }
+  const ai: AiRules = { factions: aiFactions, difficulties, defaultDifficulty };
+
   const scenarios = new Map<string, ScenarioDef>();
   check.array(raw.scenarios, 'scenarios').forEach((item, index) => {
     const r = check.object(item, `scenarios[${index}]`);
@@ -532,7 +617,11 @@ export function loadRules(raw: RawRules): Rules {
         const anchor = check.object(pr.anchor, `${pw}.anchor`);
         const faction = check.string(pr, 'faction', pw);
         if (!factions.has(faction)) check.errors.push(`${pw}.faction: unknown faction ${faction}`);
+        const aiLevel = pr.ai === undefined ? '' : check.string(pr, 'ai', pw);
+        if (aiLevel && !difficulties.has(aiLevel)) check.errors.push(`${pw}.ai: unknown difficulty ${aiLevel}`);
+        if (aiLevel && !aiFactions.has(faction)) check.errors.push(`${pw}.ai: no AI plan for faction ${faction}`);
         return {
+          ai: aiLevel,
           faction, credits: check.number(pr, 'credits', pw, 0, 1_000_000, true),
           anchor: { x: check.number(anchor, 'x', `${pw}.anchor`, 0, 1023, true), y: check.number(anchor, 'y', `${pw}.anchor`, 0, 1023, true) },
           buildings: check.array(pr.buildings ?? [], `${pw}.buildings`).map((b, bi) => {
@@ -558,5 +647,5 @@ export function loadRules(raw: RawRules): Rules {
   });
 
   if (check.errors.length) throw new RulesError(check.errors);
-  return { game, terrain, factions, units, buildings, economy, production, weapons, combat, maps, scenarios };
+  return { game, terrain, factions, units, buildings, economy, production, weapons, combat, maps, scenarios, ai };
 }

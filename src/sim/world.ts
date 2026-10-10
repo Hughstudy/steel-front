@@ -18,6 +18,8 @@ import { updateAirUnit } from './air.ts';
 import { createFog, updateFog, canSee } from './fog.ts';
 import type { PlayerFog } from './fog.ts';
 import { ProjectilePool } from './projectiles.ts';
+import { createAiState, updateAi } from './ai.ts';
+import type { AiState } from './ai.ts';
 import { SpatialGrid } from './spatial.ts';
 import type { WeaponDef } from './rules.ts';
 
@@ -34,6 +36,15 @@ export interface Player {
   notice: string;
   noticeTick: number;
   fog: PlayerFog;
+  /** Start sector tile (scenario anchor), a declared strategic destination; -1 if none. */
+  start: number;
+  /** Computer player state, or null for a human/scripted player. */
+  ai: AiState | null;
+}
+
+export interface LoadOptions {
+  /** Override the scenario's AI difficulty for every computer player. */
+  difficulty?: string;
 }
 
 /** Cosmetic event for presentation (muzzle flash, impact, death); cleared every tick, never read by the simulation. */
@@ -135,6 +146,7 @@ export class World {
       index: this.players.length, faction, credits,
       ledger: { initial: credits, delivered: 0, oil: 0, spent: 0, refunded: 0, sold: 0 },
       queues: {}, power: { supply: 0, demand: 0 }, notice: '', noticeTick: 0, fog: createFog(this.nav.size),
+      start: -1, ai: null,
     };
     this.players.push(player);
     return player;
@@ -211,7 +223,7 @@ export class World {
   }
 
   /** Place scenario forces on free tiles in breadth-first order around each anchor. */
-  loadScenario(scenario: ScenarioDef): void {
+  loadScenario(scenario: ScenarioDef, options: LoadOptions = {}): void {
     const preset = this.rules.maps.get(scenario.map)!;
     this.fogEnabled = scenario.fog;
     if (scenario.resources) {
@@ -233,6 +245,11 @@ export class World {
       const player = this.players[index];
       const anchor = this.nav.nearestInComponent(this.nav.index(setup.anchor.x, setup.anchor.y), main);
       if (anchor < 0) throw new Error(`Scenario ${scenario.id}: anchor is not near reachable ground`);
+      player.start = anchor;
+      if (setup.ai) {
+        const level = options.difficulty && this.rules.ai.difficulties.has(options.difficulty) ? options.difficulty : setup.ai;
+        player.ai = createAiState(level, this.rules.ai.difficulties.get(level)!.firstWaveTick);
+      }
       let total = 0;
       for (const group of setup.units) total += group.count;
       const tiles = this.search.collect(this, anchor, total, total * 20 + 200, tile => this.nav.occupancy[tile] === 0);
@@ -295,6 +312,7 @@ export class World {
     updateEconomy(this);
     updateProduction(this);
     this.flushRemovals();
+    updateAi(this);
   }
 
   private executeCommands(): void {
@@ -354,14 +372,14 @@ export class World {
       case 'stop':
         for (const unit of units) {
           cancelTask(this, unit);
-          unit.attack = unit.aim = -1;
+          unit.attack = unit.aim = unit.amove = -1;
           if (this.rules.units.get(unit.type)!.movement === 'air') unit.goal = unit.tile;
           else this.stopUnit(unit);
         }
         return;
       case 'move': {
         if (!this.nav.inBounds(command.x, command.y)) return;
-        for (const unit of units) { unit.attack = -1; unit.aim = -1; }
+        for (const unit of units) { unit.attack = -1; unit.aim = -1; unit.amove = -1; }
         const ground = units.filter(unit => this.rules.units.get(unit.type)!.movement === 'ground');
         // A manual move suspends autonomous hauling/capture until explicitly resumed.
         for (const unit of ground) cancelTask(this, unit);
@@ -377,7 +395,27 @@ export class World {
           cancelTask(this, unit);
           unit.attack = target.id;
           unit.aim = target.id;
+          unit.amove = -1;
           unit.chaseTick = -1000000;
+        }
+        return;
+      }
+      case 'amove': {
+        // Attack-move: armed units advance and engage whatever hostile they see on the way.
+        if (!this.nav.inBounds(command.x, command.y)) return;
+        const tile = this.nav.index(command.x, command.y);
+        for (const unit of units) {
+          cancelTask(this, unit);
+          unit.attack = -1;
+          unit.aim = -1;
+          unit.amove = -1;
+        }
+        const ground = units.filter(unit => this.rules.units.get(unit.type)!.movement === 'ground');
+        this.orderMove(ground, tile);
+        for (const unit of units) {
+          const def = this.rules.units.get(unit.type)!;
+          if (def.movement === 'air') { unit.goal = tile; unit.target = -1; }
+          if (def.weapons.length > 0) { unit.amove = unit.goal; unit.chaseTick = this.tick; }
         }
         return;
       }

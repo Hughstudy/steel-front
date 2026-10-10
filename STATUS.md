@@ -1,5 +1,23 @@
 # Steel Front status
 
+## Done — M5: Skirmish AI
+Completed 2026-10-10. The default scenario "Skirmish vs AI" pits your MCV against a computer-controlled Axis MCV across the river, at Recruit, Regular or Veteran difficulty (selector in the top bar).
+
+- The data-driven planner (`data/ai.json`, `src/sim/ai.ts`) uses only legal commands. It handles bootstrap, spaced building placement, power, trucks and engineers, composition-weighted production, defence, escalating attack-move waves, and recovery or bankruptcy fallback, all deterministically.
+- Attack-move for everyone: Ctrl/⌘+right-click or the ATK-MOVE button.
+- Details and evidence: `docs/verification/M5.md`.
+
+## Verification (M5)
+- `npm test`: 69/69 pass. `npm run build`: pass.
+- Browser dev: deployed and built a base with real clicks. The AI's first wave stayed hidden by fog until in sight. Ctrl+right-click and the ATK-MOVE button both gave real attack-move orders. The difficulty select restarted with a Veteran AI.
+- Preview: wave timings were identical to the headless run; p99 tick 0.3 ms. No console messages.
+- Not done: a complete hand-played match to victory or defeat (victory rules arrive in M6).
+
+## Next — M6: Complete match and static delivery
+Menus and skirmish setup, the objective/victory rule, WebAudio, effects polish, versioned saves, a second map preset, subdirectory hosting test, and Caddy docs.
+
+---
+
 ## Done — M4: Combat and fog
 Completed 2026-10-10. The default scenario "Combat Sandbox" gives each side a base and a mixed army on opposite banks. "Battle Stress (200)" is a 100 v 100 profiling battle.
 
@@ -14,9 +32,6 @@ Completed 2026-10-10. The default scenario "Combat Sandbox" gives each side a ba
 - Browser dev: real drag-select, right-click move and right-click attack (all 19 armed units targeted the clicked squad). The battle shows effects, promotions, fog and minimap shroud.
 - Preview: 200-unit battle benchmark. Frame CPU median 0.2 ms, p95 1.5 ms, max 5.6 ms. Sim tick max 5.5 ms; projectile peak 20. No console messages.
 - Not measured: long-session real-time frame pacing.
-
-## Next — M5: AI
-Computer opponent driven by `data/ai.json`, with difficulty knobs: build order, economy, army composition, attack waves, defence. It must respect fog.
 
 ---
 

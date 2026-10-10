@@ -1,0 +1,132 @@
+{
+  "factions": {
+    "allies": {
+      "power": "allied_power",
+      "truck": "allied_truck",
+      "engineer": "allied_engineer",
+      "base": [
+        { "type": "allied_power", "count": 1 },
+        { "type": "allied_barracks", "count": 1 },
+        { "type": "allied_factory", "count": 1 },
+        { "type": "allied_power", "count": 2 },
+        { "type": "allied_airfield", "count": 1, "afterTick": 6000 },
+        { "type": "allied_power", "count": 3, "afterTick": 6000 },
+        { "type": "allied_barracks", "count": 2, "afterTick": 9000 },
+        { "type": "allied_factory", "count": 2, "afterTick": 12000 },
+        { "type": "allied_power", "count": 4, "afterTick": 12000 }
+      ],
+      "army": {
+        "allied_rifle": 6,
+        "allied_mg": 2,
+        "allied_sniper": 1,
+        "allied_halftrack": 2,
+        "allied_light_tank": 2,
+        "allied_medium_tank": 4,
+        "allied_heavy_tank": 1,
+        "allied_at_gun": 2,
+        "allied_artillery": 1,
+        "allied_fighter": 1
+      }
+    },
+    "axis": {
+      "power": "axis_power",
+      "truck": "axis_truck",
+      "engineer": "axis_engineer",
+      "base": [
+        { "type": "axis_power", "count": 1 },
+        { "type": "axis_barracks", "count": 1 },
+        { "type": "axis_factory", "count": 1 },
+        { "type": "axis_power", "count": 2 },
+        { "type": "axis_airfield", "count": 1, "afterTick": 6000 },
+        { "type": "axis_power", "count": 3, "afterTick": 6000 },
+        { "type": "axis_barracks", "count": 2, "afterTick": 9000 },
+        { "type": "axis_factory", "count": 2, "afterTick": 12000 },
+        { "type": "axis_power", "count": 4, "afterTick": 12000 }
+      ],
+      "army": {
+        "axis_rifle": 6,
+        "axis_mg": 2,
+        "axis_sniper": 1,
+        "axis_halftrack": 2,
+        "axis_light_tank": 2,
+        "axis_medium_tank": 4,
+        "axis_heavy_tank": 1,
+        "axis_at_gun": 2,
+        "axis_artillery": 1,
+        "axis_fighter": 1
+      }
+    }
+  },
+  "defaultDifficulty": "normal",
+  "difficulties": [
+    {
+      "id": "easy",
+      "name": "Recruit",
+      "thinkIntervalTicks": 30,
+      "actionsPerThink": 2,
+      "tempoPercent": 150,
+      "truckTarget": 2,
+      "engineerTarget": 1,
+      "queueDepth": 1,
+      "armyCap": 24,
+      "firstWaveTick": 8400,
+      "waveIntervalTicks": 4200,
+      "waveStartSize": 4,
+      "waveGrowth": 2,
+      "waveMaxSize": 10,
+      "defenseReserve": 3,
+      "defenseRadius": 12,
+      "defenseCalmTicks": 300,
+      "powerMargin": 0,
+      "placementTries": 16,
+      "retryTicks": 200,
+      "bankruptcyRetryTicks": 1200
+    },
+    {
+      "id": "normal",
+      "name": "Regular",
+      "thinkIntervalTicks": 20,
+      "actionsPerThink": 3,
+      "tempoPercent": 100,
+      "truckTarget": 3,
+      "engineerTarget": 2,
+      "queueDepth": 2,
+      "armyCap": 40,
+      "firstWaveTick": 6000,
+      "waveIntervalTicks": 3000,
+      "waveStartSize": 6,
+      "waveGrowth": 3,
+      "waveMaxSize": 18,
+      "defenseReserve": 4,
+      "defenseRadius": 14,
+      "defenseCalmTicks": 240,
+      "powerMargin": 20,
+      "placementTries": 24,
+      "retryTicks": 120,
+      "bankruptcyRetryTicks": 900
+    },
+    {
+      "id": "hard",
+      "name": "Veteran",
+      "thinkIntervalTicks": 10,
+      "actionsPerThink": 5,
+      "tempoPercent": 70,
+      "truckTarget": 4,
+      "engineerTarget": 3,
+      "queueDepth": 3,
+      "armyCap": 60,
+      "firstWaveTick": 4800,
+      "waveIntervalTicks": 2400,
+      "waveStartSize": 8,
+      "waveGrowth": 4,
+      "waveMaxSize": 26,
+      "defenseReserve": 6,
+      "defenseRadius": 16,
+      "defenseCalmTicks": 200,
+      "powerMargin": 40,
+      "placementTries": 32,
+      "retryTicks": 80,
+      "bankruptcyRetryTicks": 600
+    }
+  ]
+}
