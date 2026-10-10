@@ -1,5 +1,13 @@
 # Steel Front status
 
+## Public repository — M2
+
+Prepared 2026-10-10 for `https://github.com/Hughstudy/steel-front` (public, `main`).
+
+- Publication uses the committed M2 code from `a5479bf`; this status note is the only addition.
+- Verified an isolated snapshot of that commit: `npm run build` passes; `npm test` passes all 37 tests.
+- In-progress M3 changes remain local and are excluded from this publication. M3 remains the next milestone.
+
 ## Done — M2: Economy
 Completed 2026-10-10. Playable "Logistics Exercise" (default scenario): an HQ fixture, three supply trucks, an engineer and two rifle squads, with 10 supply dumps and 4 oil derricks placed from `data/maps.json`.
 
