@@ -1,0 +1,27 @@
+{
+  "name": "THE LOWLANDS",
+  "subtitle": "Northern France · Autumn 1944",
+  "width": 128,
+  "height": 128,
+  "tileWidth": 64,
+  "tileHeight": 32,
+  "seed": 19440917,
+  "spawn": { "x": 57, "y": 59 },
+  "generation": {
+    "riverWidth": 2.6,
+    "forestThreshold": 0.57,
+    "forestDensity": 0.73,
+    "rockThreshold": 0.73
+  },
+  "palette": {
+    "grass": "#7e8761",
+    "forest": "#5f704e",
+    "water": "#588082",
+    "sand": "#afa184",
+    "road": "#b7a987",
+    "rock": "#929486",
+    "bridge": "#998f74",
+    "field": "#a49c65",
+    "background": "#263737"
+  }
+}
