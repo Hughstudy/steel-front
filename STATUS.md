@@ -21,6 +21,13 @@ Completed 2026-10-10 (Asia/Singapore). Playable reconnaissance build; no later m
 - Captured production preview: `docs/m0-preview.jpg`.
 - Fixed during manual QA: disconnected road artwork, diagonal approach-road gaps, overlapping bridge lanes, and Space intercepting focused HUD buttons.
 
+## Implementation handoff
+
+- Added `CLAUDE_PLAN.md`: full M1–M6 implementation order, architecture/data contracts, design defaults, acceptance scenarios and review evidence requirements.
+- Added `CLAUDE.md`: entry instructions for Claude Code. Start with the M1 prompt at the end of the plan.
+- This is a documentation-only handoff. M0 remains the only implemented milestone; no M1 runtime work has begun.
+- Handoff check: existing 13 tests and the production build still pass; no browser re-test was needed for these documentation-only changes.
+
 ## Next — M1 (next session)
 - Data-driven unit definitions including future cost/build time/prerequisite fields.
 - Render animated directional units; box select and right-click move.
