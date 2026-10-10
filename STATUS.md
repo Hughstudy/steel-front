@@ -7,8 +7,10 @@ Completed 2026-10-10. Fighters now finish explicit move/rally orders before auto
 - Added nine aircraft regressions and two camera input regressions. The original aircraft failures and both camera failures were reproduced before the fixes.
 - `npm test`: **94/94 pass**. `npm run build` and `git diff --check`: pass. Independent review of the aircraft changes found no actionable issues.
 - Dev browser, real input: new skirmish, MCV deployment, generator queue and placement, prerequisite unlock, save/load and resume; no console warnings/errors. HUD showed 60 FPS during these checks.
-- GitHub Pages delivery is in progress; source goes to `main`, compiled static files to `gh-pages`.
-- Next: verify the published URL and remove temporary review/deployment files. No additional milestone is planned.
+- **Published:** https://hughstudy.github.io/steel-front/ — source on `main`, compiled static files on `gh-pages`. Pages reports `built`; public HTML, JS and CSS exactly match the tested build from `a43a8a9` (deployment `ba5c98c`).
+- **Live browser:** Axis/Ardennes/Regular setup, MCV deployment and production queue worked with real clicks; no console warnings/errors. Local checks also covered Allies/Lowlands and save/load.
+- Removed the old temporary M2/review copies, review probe output, npm cache and release staging directory. Retained source, dependencies, production output and permanent verification evidence.
+- Next: user playtesting and the remaining manual checks below. No additional milestone is planned. Evidence: `docs/verification/aircraft-release.md`.
 - Known limitations remain: no fully hand-played victory, audio not checked by ear, and long-session frame pacing on a target laptop not certified.
 
 ## Done — M6: Complete match and static delivery

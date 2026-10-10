@@ -20,6 +20,13 @@
 
 ## Delivery
 
-The production build uses relative asset paths and includes `.nojekyll`. Source is published to `main`; `gh-pages` contains compiled static files. Public URL verification and temporary-file cleanup are recorded in STATUS.md once complete.
+The production build uses relative asset paths and includes `.nojekyll`. Source is published to `main`; `gh-pages` contains compiled static files.
+
+- Public URL: https://hughstudy.github.io/steel-front/
+- Runtime source commit: `a43a8a9a132652895b6a9cc767a3717218918db7`.
+- Deployment commit: `ba5c98ca8d07b54807fccba137e500550dd2f2ad`.
+- GitHub Pages reports `built`, with HTTPS enforced. The public HTML, JavaScript and CSS match the local production build byte for byte. `build-info.json` identifies the source commit.
+- Real input on the public URL: chose Axis / The Ardennes / Regular, started a battle, selected and deployed the MCV, then queued a Kraftwerk. Funds and production progress updated. No browser warnings/errors.
+- Removed the temporary M2/review copies, review JSONL output, npm cache and release staging directory. Permanent verification files, installed dependencies and the usable production build remain.
 
 Existing limitations: no fully hand-played victory, no listening test for audio, and no sustained target-laptop frame-pacing measurement.
