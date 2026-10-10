@@ -424,6 +424,7 @@ export class World {
         for (const unit of units) {
           cancelTask(this, unit);
           unit.attack = unit.aim = unit.amove = -1;
+          unit.airMove = false; unit.airPass = -1;
           if (this.rules.units.get(unit.type)!.movement === 'air') unit.goal = unit.tile;
           else this.stopUnit(unit);
         }
@@ -435,7 +436,10 @@ export class World {
         // A manual move suspends autonomous hauling/capture until explicitly resumed.
         for (const unit of ground) cancelTask(this, unit);
         this.orderMove(ground, this.nav.index(command.x, command.y));
-        for (const unit of units) if (this.rules.units.get(unit.type)!.movement === 'air') { unit.goal = this.nav.index(command.x, command.y); unit.target = -1; }
+        for (const unit of units) if (this.rules.units.get(unit.type)!.movement === 'air') {
+          unit.goal = this.nav.index(command.x, command.y); unit.target = -1;
+          unit.airMove = true; unit.airPass = -1;
+        }
         return;
       }
       case 'attack': {
@@ -447,6 +451,7 @@ export class World {
           unit.attack = target.id;
           unit.aim = target.id;
           unit.amove = -1;
+          unit.airMove = false; unit.airPass = -1;
           unit.chaseTick = -1000000;
         }
         return;
@@ -460,6 +465,7 @@ export class World {
           unit.attack = -1;
           unit.aim = -1;
           unit.amove = -1;
+          unit.airMove = false; unit.airPass = -1;
         }
         const ground = units.filter(unit => this.rules.units.get(unit.type)!.movement === 'ground');
         this.orderMove(ground, tile);

@@ -288,7 +288,7 @@ function spawnProduced(world: World, player: number, item: QueueItem): boolean {
       // Aircraft take off from the producer and hold over it (or its rally point).
       const s = world.subTile;
       const unit = world.spawnUnit(item.type, player, world.nav.index(Math.floor(producer.x / s), Math.floor(producer.y / s)));
-      if (producer.rally >= 0) unit.goal = producer.rally;
+      if (producer.rally >= 0) { unit.goal = producer.rally; unit.airMove = true; }
       return true;
     }
     const tile = exitTile(world, producer);

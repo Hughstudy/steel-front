@@ -97,6 +97,10 @@ export interface Entity {
   attacker: number;
   /** Attack-move destination tile (-1 none): engage anything hostile in sight on the way. */
   amove: number;
+  /** Aircraft manual/rally movement takes priority over automatic combat until arrival. */
+  airMove: boolean;
+  /** Aircraft egress waypoint tile (-1 = approaching the current target). */
+  airPass: number;
 }
 
 export function createEntity(id: number, kind: EntityKind, type: string, owner: number, hp: number): Entity {
@@ -109,5 +113,6 @@ export function createEntity(id: number, kind: EntityKind, type: string, owner: 
     yieldPath: null, yieldIndex: 0, yieldAvoid: null, resume: false, repath: 0, odometer: 0,
     cargo: 0, stock: 0, task: '', target: -1, preferred: -1, timer: 0, status: '', auto: false, docks: null, rally: -1, repairing: false,
     cooldowns: [], attack: -1, aim: -1, setup: 0, chaseTick: 0, xp: 0, rank: 0, killer: -1, attacker: -1, amove: -1,
+    airMove: false, airPass: -1,
   };
 }

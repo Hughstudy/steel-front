@@ -157,7 +157,7 @@ function updateShooter(world: World, unit: Entity, def: UnitDef): void {
   else {
     const current = validTarget(world, unit, def, unit.aim);
     const firesOnTheMove = def.weapons.some(id => world.rules.weapons.get(id)!.fireWhileMoving);
-    const mayAcquire = (!moving(unit) || firesOnTheMove) && unit.task === '';
+    const mayAcquire = (!moving(unit) || firesOnTheMove) && unit.task === '' && !unit.airMove;
     const due = (world.tick + unit.id) % combat.acquireIntervalTicks === 0;
     if (!mayAcquire) unit.aim = -1;
     else if (!current || due) unit.aim = acquire(world, unit, def);
@@ -173,10 +173,13 @@ function updateShooter(world: World, unit: Entity, def: UnitDef): void {
 
   if (!target) {
     if (def.capabilities.turret) unit.turret = turnToward(unit.turret, unit.facing, def.turretTurnRate);
-    if (air) unit.target = -1;
+    if (air) { unit.target = -1; unit.airPass = -1; }
     return;
   }
-  if (air) unit.target = target.id;
+  if (air) {
+    if (unit.target !== target.id) unit.airPass = -1;
+    unit.target = target.id;
+  }
   const dx = target.x - unit.x;
   const dy = target.y - unit.y;
   const d2 = dx * dx + dy * dy;

@@ -1,5 +1,16 @@
 # Steel Front status
 
+## Done — aircraft review fixes and release verification
+Completed 2026-10-10. Fighters now finish explicit move/rally orders before automatically engaging, and close targets trigger an escape/re-approach pass instead of an endless non-firing orbit. Attack, attack-move and stop replace the previous flight order. Flight state survives save/load, including older version-1 saves.
+
+- Fixed camera edge-scroll drift when closing a menu over a stationary pointer.
+- Added nine aircraft regressions and two camera input regressions. The original aircraft failures and both camera failures were reproduced before the fixes.
+- `npm test`: **94/94 pass**. `npm run build` and `git diff --check`: pass. Independent review of the aircraft changes found no actionable issues.
+- Dev browser, real input: new skirmish, MCV deployment, generator queue and placement, prerequisite unlock, save/load and resume; no console warnings/errors. HUD showed 60 FPS during these checks.
+- GitHub Pages delivery is in progress; source goes to `main`, compiled static files to `gh-pages`.
+- Next: verify the published URL and remove temporary review/deployment files. No additional milestone is planned.
+- Known limitations remain: no fully hand-played victory, audio not checked by ear, and long-session frame pacing on a target laptop not certified.
+
 ## Done — M6: Complete match and static delivery
 Completed 2026-10-10. The game opens on a main menu. New Skirmish lets you choose a faction (Allies or Axis), a map (The Lowlands or The Ardennes) and an AI difficulty, then plays to a decided result: you lose when your MCV (before deploying) or your HQ is destroyed, and you win when the enemy's is.
 

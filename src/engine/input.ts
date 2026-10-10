@@ -29,7 +29,8 @@ export class CameraInput {
     window.addEventListener('blur', this.clear, options);
     document.addEventListener('visibilitychange', this.clear, options);
     canvas.addEventListener('pointermove', this.pointerMove, options);
-    canvas.addEventListener('pointerenter', () => { this.inside = true; }, options);
+    // Closing a menu may reveal a stationary pointer without a pointermove.
+    canvas.addEventListener('pointerenter', this.pointerMove, options);
     canvas.addEventListener('pointerleave', () => { this.inside = false; }, options);
     canvas.addEventListener('pointerdown', this.pointerDown, options);
     canvas.addEventListener('pointerup', this.pointerUp, options);

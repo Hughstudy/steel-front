@@ -1,6 +1,6 @@
 import type { TerrainMap } from '../types.ts';
 import type { Command } from './commands.ts';
-import { createEntity } from './entities.ts';
+import { createEntity, MoveState } from './entities.ts';
 import type { Entity } from './entities.ts';
 import type { MemoryRecord } from './fog.ts';
 import { createAiState } from './ai.ts';
@@ -261,6 +261,16 @@ export function parseSave(text: string, rules: Rules): SaveFile {
   check(file.label, S, 'label');
   check(file.savedAt, S, 'savedAt');
   checkSetup(file.setup, rules);
+  // Version 1 saves predate explicit aircraft order/pass state. Preserve their
+  // unfinished move goals; all other aircraft begin a fresh approach after load.
+  const world = file.world as Partial<WorldState> | undefined;
+  if (world && Array.isArray(world.entities)) for (const entity of world.entities) {
+    if (!entity || typeof entity !== 'object') continue;
+    if (!Object.hasOwn(entity, 'airMove')) Object.assign(entity, {
+      airMove: rules.units.get(entity.type)?.movement === 'air' && entity.attack < 0 && entity.amove < 0 && entity.target < 0 && entity.goal >= 0 && entity.moveState === MoveState.Moving,
+    });
+    if (!Object.hasOwn(entity, 'airPass')) Object.assign(entity, { airPass: -1 });
+  }
   check(file.world, WORLD, 'world');
   return file as unknown as SaveFile;
 }
@@ -314,6 +324,7 @@ export function restoreWorld(rules: Rules, map: TerrainMap, file: SaveFile): Wor
     fail(!def, `entity ${entity.id}: unknown type ${entity.type}`);
     fail(!int(entity.id, 1, state.nextId - 1) || world.byId.has(entity.id), `entity ${entity.id}: invalid or duplicate id`);
     fail(!int(entity.owner, -1, players - 1) || !int(entity.tile, -1, size - 1) || !int(entity.next, -1, size - 1) || !int(entity.goal, -1, size - 1), `entity ${entity.id}: owner or position out of range`);
+    fail(!int(entity.airPass, -1, size - 1), `entity ${entity.id}: aircraft pass out of range`);
     fail(entity.path !== null && entity.path.some(tile => !int(tile, 0, size - 1)), `entity ${entity.id}: invalid path`);
     world.entities.push(entity);
     world.byId.set(entity.id, entity);
