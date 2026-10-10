@@ -1,5 +1,14 @@
 # Steel Front status
 
+## Independent review — M0–M5
+
+Reviewed 2026-10-10 at committed M5 baseline `e67f5c0`, isolated from active M6 edits. The build and all 69 tests pass. M0–M5 systems are implemented, including the computer opponent, but seven reproduced P2 defects remain: artillery minimum-range stalling; hidden-structure preview leaks; resource/capture orders retaining old movement; aircraft move input over blocked ground; production keyboard focus loss; placement moving hostile units; and AI oil capture after MCV relocation.
+
+- Report, evidence, and reproduction instructions: `docs/verification/M0-M5-review.md`.
+- Independent checks also passed both-faction MCV-to-income bootstrap and a 200-unit opposing-traffic exercise.
+- Next: fix the review findings and add focused regressions alongside the ongoing M6 work. M6 completion and sustained target-machine 60 FPS are not certified by this review.
+- This review changes documentation/evidence only; it does not alter runtime code or declare a new milestone complete.
+
 ## Done — M5: Skirmish AI
 Completed 2026-10-10. The default scenario "Skirmish vs AI" pits your MCV against a computer-controlled Axis MCV across the river, at Recruit, Regular or Veteran difficulty (selector in the top bar).
 
