@@ -1,0 +1,21 @@
+{
+  "terrain": [
+    { "id": "meadow", "name": "Open ground", "passable": { "ground": true, "air": true }, "buildable": true },
+    { "id": "woodland", "name": "Woodland", "passable": { "ground": true, "air": true }, "buildable": true },
+    { "id": "river", "name": "River", "passable": { "ground": false, "air": true }, "buildable": false },
+    { "id": "riverbank", "name": "Riverbank", "passable": { "ground": true, "air": true }, "buildable": true },
+    { "id": "road", "name": "Country road", "passable": { "ground": true, "air": true }, "buildable": true },
+    { "id": "rock", "name": "Rocky ground", "passable": { "ground": true, "air": true }, "buildable": false },
+    { "id": "bridge", "name": "River crossing", "passable": { "ground": true, "air": true }, "buildable": false },
+    { "id": "farmland", "name": "Farmland", "passable": { "ground": true, "air": true }, "buildable": true }
+  ],
+  "props": [
+    { "index": 1, "id": "oak", "blocks": { "ground": true, "air": false }, "buildable": false },
+    { "index": 2, "id": "pine", "blocks": { "ground": true, "air": false }, "buildable": false },
+    { "index": 3, "id": "boulder", "blocks": { "ground": true, "air": false }, "buildable": false },
+    { "index": 4, "id": "cottage", "blocks": { "ground": true, "air": false }, "buildable": false },
+    { "index": 5, "id": "ruin", "blocks": { "ground": true, "air": false }, "buildable": false },
+    { "index": 6, "id": "tower", "blocks": { "ground": true, "air": false }, "buildable": false },
+    { "index": 7, "id": "hedge", "blocks": { "ground": false, "air": false }, "buildable": false }
+  ]
+}

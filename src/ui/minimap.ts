@@ -1,5 +1,13 @@
 import type { CameraView, MapConfig, TerrainMap } from '../types.ts';
 
+/** Minimap markers supplied by the game each frame (tile-space centres). */
+export interface MinimapDots {
+  count: number;
+  x: Float32Array;
+  y: Float32Array;
+  color: string[];
+}
+
 const terrainKeys = ['grass', 'forest', 'water', 'sand', 'road', 'rock', 'bridge', 'field'];
 const fallbackColors = ['#7e8761', '#5f704e', '#588082', '#afa184', '#b7a987', '#929486', '#998f74', '#a49c65'];
 
@@ -52,7 +60,7 @@ export class Minimap {
     });
   }
 
-  render(view: CameraView): void {
+  render(view: CameraView, dots: MinimapDots | null = null): void {
     const ctx = this.context;
     const scale = this.scale;
     const ox = this.originX;
@@ -75,6 +83,14 @@ export class Minimap {
     ctx.lineWidth = 0.6;
     ctx.stroke();
     ctx.clip();
+    if (dots) {
+      const hw = this.config.tileWidth / 2 * scale;
+      const hh = this.config.tileHeight / 2 * scale;
+      for (let i = 0; i < dots.count; i++) {
+        ctx.fillStyle = dots.color[i];
+        ctx.fillRect(ox + (dots.x[i] - dots.y[i]) * hw - 1.2, oy + (dots.x[i] + dots.y[i]) * hh - 1.2, 2.4, 2.4);
+      }
+    }
     const width = view.width / view.zoom * scale;
     const height = view.height / view.zoom * scale;
     const x = ox + view.x * scale - width / 2;

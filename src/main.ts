@@ -1,22 +1,60 @@
 import mapData from '../data/map.json';
+import gameData from '../data/game.json';
+import terrainData from '../data/terrain.json';
+import factionData from '../data/factions.json';
+import unitData from '../data/units.json';
+import scenarioData from '../data/scenarios.json';
 import type { MapConfig } from './types.ts';
 import { Camera } from './engine/camera.ts';
 import { CameraInput } from './engine/input.ts';
 import { GameLoop } from './engine/loop.ts';
 import { generateTerrain } from './sim/terrain.ts';
+import { loadRules } from './sim/rules.ts';
+import { World } from './sim/world.ts';
+import type { Entity } from './sim/entities.ts';
 import { TerrainRenderer } from './render/terrain-renderer.ts';
+import { EntityLayer } from './render/entity-layer.ts';
+import { OrderMarkers } from './render/markers.ts';
 import { Hud } from './ui/hud.ts';
+import type { MinimapDots } from './ui/minimap.ts';
+import { Selection } from './ui/selection.ts';
+import { SelectionPanel } from './ui/selection-panel.ts';
+import { GameInput } from './ui/game-input.ts';
 
 const config: MapConfig = mapData;
+const rules = loadRules({ game: gameData, terrain: terrainData, factions: factionData, units: unitData, scenarios: scenarioData });
 const canvas = document.querySelector<HTMLCanvasElement>('#battlefield')!;
 const viewport = document.querySelector<HTMLElement>('#viewport')!;
 const map = generateTerrain(config);
 const camera = new Camera(map.width, map.height);
 const renderer = new TerrainRenderer(canvas, map, config);
+const layer = new EntityLayer();
+const markers = new OrderMarkers();
+const selection = new Selection();
+const PLAYER = 0;
+let world = new World(rules, map, config.seed);
+let scenarioId = 'm1-maneuvers';
 let showGrid = false;
-let simulationTick = 0;
+let presentationTime = 0;
 const stats = { fps: 60, frameMs: 0, tick: 0, visibleChunks: 0, grid: false };
-const reset = (): void => camera.reset(config.spawn.x, config.spawn.y);
+
+function startScenario(id: string): void {
+  const scenario = rules.scenarios.get(id)!;
+  scenarioId = id;
+  world = new World(rules, map, config.seed);
+  world.loadScenario(scenario);
+  layer.warm(world);
+  selection.clear();
+  camera.reset(scenario.camera.x, scenario.camera.y);
+  document.getElementById('scenario-stress')?.setAttribute('aria-pressed', String(id === 'm1-stress'));
+  const title = document.getElementById('command-title');
+  if (title) title.textContent = scenario.name;
+}
+
+const reset = (): void => {
+  const scenario = rules.scenarios.get(scenarioId)!;
+  camera.reset(scenario.camera.x, scenario.camera.y);
+};
 const toggleGrid = (): void => { showGrid = !showGrid; };
 const hud = new Hud(map, config, {
   zoomIn: () => camera.zoomAt(1.2),
@@ -25,7 +63,53 @@ const hud = new Hud(map, config, {
   toggleGrid,
   jump: (x, y) => camera.jump(x, y),
 });
-const input = new CameraInput(canvas, camera, (x, y) => hud.inspect(x, y), reset, toggleGrid);
+const panel = new SelectionPanel(type => selection.set(selection.list().filter(id => world.get(id)?.type === type)));
+const cameraInput = new CameraInput(canvas, camera, (x, y) => hud.inspect(x, y), reset, toggleGrid);
+
+function stopSelected(): void {
+  const ids = selection.list();
+  if (ids.length) world.enqueue({ player: PLAYER, kind: 'stop', ids, x: 0, y: 0 });
+}
+
+const gameInput = new GameInput(canvas, camera, layer, selection, {
+  player: () => PLAYER,
+  world: () => world,
+  selectable: (entity: Entity) => entity.owner === PLAYER,
+  order: (tileX, tileY) => {
+    const ids = selection.list();
+    const x = Math.floor(tileX);
+    const y = Math.floor(tileY);
+    const nav = world.nav;
+    let kind: 'move' | 'nearest' | 'invalid' = 'invalid';
+    if (nav.inBounds(x, y)) {
+      // Read-only preview of how the simulation will resolve this target, for feedback.
+      const lead = world.get(ids[0]);
+      const component = lead ? nav.componentOf(lead.next >= 0 ? lead.next : lead.tile) : -1;
+      const resolved = component >= 0 ? nav.nearestInComponent(nav.index(x, y), component) : -1;
+      kind = resolved < 0 ? 'invalid' : resolved === nav.index(x, y) ? 'move' : 'nearest';
+      if (resolved >= 0) {
+        world.enqueue({ player: PLAYER, kind: 'move', ids, x, y });
+        markers.add((resolved % nav.width) + 0.5, ((resolved / nav.width) | 0) + 0.5, kind, presentationTime);
+        return;
+      }
+    }
+    markers.add(tileX, tileY, kind, presentationTime);
+  },
+  stop: stopSelected,
+  centerOn: ids => {
+    let sx = 0; let sy = 0; let n = 0;
+    for (const id of ids) {
+      const e = world.get(id);
+      if (!e) continue;
+      sx += e.x / world.subTile; sy += e.y / world.subTile; n++;
+    }
+    if (n) camera.jump(sx / n - 0.5, sy / n - 0.5);
+  },
+});
+
+document.getElementById('scenario-reset')!.addEventListener('click', () => startScenario('m1-maneuvers'));
+document.getElementById('scenario-stress')!.addEventListener('click', () => startScenario(scenarioId === 'm1-stress' ? 'm1-maneuvers' : 'm1-stress'));
+document.getElementById('order-stop')!.addEventListener('click', stopSelected);
 
 function resize(): void {
   const width = viewport.clientWidth;
@@ -38,44 +122,122 @@ function resize(): void {
 const observer = new ResizeObserver(resize);
 observer.observe(viewport);
 resize();
-reset();
+startScenario(scenarioId);
 hud.inspect(config.spawn.x, config.spawn.y);
 
+const dots: MinimapDots = { count: 0, x: new Float32Array(4096), y: new Float32Array(4096), color: [] };
+function fillDots(): void {
+  let n = 0;
+  for (const entity of world.entities) {
+    if (n >= dots.x.length) break;
+    dots.x[n] = entity.x / world.subTile;
+    dots.y[n] = entity.y / world.subTile;
+    dots.color[n] = selection.ids.has(entity.id) ? '#ffffff' : entity.owner === PLAYER ? '#d8f08a' : '#ef6b52';
+    n++;
+  }
+  dots.count = n;
+}
+
+const hoverTile = { x: 0, y: 0 };
+function updateCursor(hovered: Entity | null): void {
+  let cursor = '';
+  if (hovered && hovered.owner === PLAYER) cursor = 'cursor-select';
+  else if (selection.ids.size > 0 && gameInput.pointerTile(hoverTile)) {
+    const x = Math.floor(hoverTile.x);
+    const y = Math.floor(hoverTile.y);
+    cursor = world.nav.inBounds(x, y) && world.nav.passable(world.nav.index(x, y)) ? 'cursor-move' : 'cursor-invalid';
+  }
+  canvas.classList.toggle('cursor-select', cursor === 'cursor-select');
+  canvas.classList.toggle('cursor-move', cursor === 'cursor-move');
+  canvas.classList.toggle('cursor-invalid', cursor === 'cursor-invalid');
+}
+
 let lastReport = performance.now();
+let lastPanel = 0;
 let frames = 0;
 let renderDuration = 0;
-const loop = new GameLoop(
-  (_dt, tick) => { simulationTick = tick; },
-  (alpha, dt) => {
-    const started = performance.now();
-    input.update(dt);
-    camera.update(dt);
-    // Previous/current sim interpolation is also the time source for ambient animation.
-    const time = Math.max(0, simulationTick - 1 + alpha) * loop.clock.step;
-    renderer.render(camera.view, time, showGrid);
-    hud.renderMinimap(camera.view);
-    renderDuration += performance.now() - started;
-    frames++;
-    if (started - lastReport >= 500) {
-      stats.fps = Math.round(frames * 1000 / (started - lastReport));
-      stats.frameMs = renderDuration / frames;
-      stats.tick = simulationTick;
-      stats.visibleChunks = renderer.visibleChunks;
-      stats.grid = showGrid;
-      hud.update(camera.view, stats);
-      frames = 0;
-      renderDuration = 0;
-      lastReport = started;
-    }
-  },
-);
+let simDuration = 0;
+function simulate(): void {
+  const started = performance.now();
+  world.step();
+  simDuration += performance.now() - started;
+}
+
+function renderFrame(alpha: number, dt: number): void {
+  const started = performance.now();
+  presentationTime += dt;
+  cameraInput.update(dt);
+  camera.update(dt);
+  selection.prune(world, PLAYER);
+  const hovered = gameInput.hovered();
+  layer.prepare(world, camera.view, alpha, { selected: selection.ids, hovered: hovered ? hovered.id : 0 });
+  renderer.render(camera.view, Math.max(0, world.tick - 1 + alpha) * loop.clock.step, showGrid, layer);
+  const context = canvas.getContext('2d')!;
+  markers.draw(context, presentationTime);
+  layer.drawOverlays(context);
+  if (gameInput.box.active) {
+    const dpr = canvas.width / camera.view.width;
+    context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const { x0, y0, x1, y1 } = gameInput.box;
+    context.fillStyle = 'rgba(226,236,170,.08)';
+    context.fillRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
+    context.strokeStyle = 'rgba(236,240,190,.9)';
+    context.lineWidth = 1;
+    context.strokeRect(Math.min(x0, x1) + 0.5, Math.min(y0, y1) + 0.5, Math.abs(x1 - x0), Math.abs(y1 - y0));
+  }
+  fillDots();
+  hud.renderMinimap(camera.view, dots);
+  updateCursor(hovered);
+  if (started - lastPanel > 120) {
+    panel.update(world, selection, layer);
+    lastPanel = started;
+  }
+  renderDuration += performance.now() - started;
+  frames++;
+  if (started - lastReport >= 500) {
+    stats.fps = Math.round(frames * 1000 / (started - lastReport));
+    stats.frameMs = (renderDuration + simDuration) / frames;
+    stats.tick = world.tick;
+    stats.visibleChunks = renderer.visibleChunks;
+    stats.grid = showGrid;
+    hud.update(camera.view, stats);
+    frames = 0;
+    renderDuration = 0;
+    simDuration = 0;
+    lastReport = started;
+  }
+}
+const loop = new GameLoop(simulate, renderFrame);
 loop.start();
 
-// Vite HMR disposes active listeners/RAF instead of stacking loops during development.
+/**
+ * QA benchmark: renders `frames` frames synchronously while panning, advancing one
+ * simulation tick every third frame (≈60 FPS cadence). Reports CPU time per frame.
+ */
+function benchmark(frames = 600): Record<string, number> {
+  const samples: number[] = [];
+  const simSamples: number[] = [];
+  for (let i = 0; i < frames; i++) {
+    const start = performance.now();
+    if (i % 3 === 0) { const s = performance.now(); world.step(); simSamples.push(performance.now() - s); }
+    camera.pan(Math.sin(i / 60) * 6, Math.cos(i / 80) * 3, true);
+    renderFrame((i % 3) / 3, 1 / 60);
+    samples.push(performance.now() - start);
+  }
+  samples.sort((a, b) => a - b);
+  simSamples.sort((a, b) => a - b);
+  const pick = (list: number[], q: number): number => Math.round(list[Math.min(list.length - 1, Math.floor(list.length * q))] * 100) / 100;
+  return { frames, units: world.entities.length, visible: layer.count, median: pick(samples, 0.5), p95: pick(samples, 0.95), max: pick(samples, 1), simMedian: pick(simSamples, 0.5), simMax: pick(simSamples, 1) };
+}
+
+// Debug/QA hook for measuring in the browser without affecting the simulation.
+(window as unknown as { steelFront: unknown }).steelFront = { get world() { return world; }, camera, selection, layer, benchmark, startScenario };
+
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     loop.stop();
-    input.destroy();
+    cameraInput.destroy();
+    gameInput.destroy();
     observer.disconnect();
   });
 }

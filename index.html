@@ -12,7 +12,7 @@
       <header class="topbar">
         <div class="wordmark" aria-label="Steel Front"><span class="insignia" aria-hidden="true">✦</span><span>STEEL <b>FRONT</b></span></div>
         <span class="top-divider"></span>
-        <span class="mode"><i></i> M0 <span class="mode-slash">/</span> RECONNAISSANCE</span>
+        <span class="mode"><i></i> <span id="mode-label">M1 <span class="mode-slash">/</span> MANEUVERS</span></span>
         <div class="resources" aria-label="Resources unavailable during reconnaissance">
           <span class="resource"><span class="resource-icon" aria-hidden="true">$</span><span class="resource-label">FUNDS</span><b>—</b></span>
           <span class="resource"><span class="resource-icon power-icon" aria-hidden="true">ϟ</span><span class="resource-label">POWER</span><b>—</b></span>
@@ -22,7 +22,7 @@
       <main id="viewport" aria-label="Battlefield viewport">
         <canvas id="battlefield" tabindex="0" aria-label="Isometric battlefield. Move the camera with WASD or the arrow keys. Scroll to zoom."></canvas>
         <div class="map-heading"><span class="eyebrow">EUROPEAN THEATER · 1944</span><h1 id="map-name">OPERATION GREENBRIDGE</h1><span class="map-subtitle" id="map-subtitle">Survey the ground. Know the battlefield.</span></div>
-        <div class="mission-note"><span class="mission-dot" aria-hidden="true"></span><span>RECON THE SECTOR<small>Explore the map. Locate crossings and approach routes.</small></span></div>
+        <div class="mission-note"><span class="mission-dot" aria-hidden="true"></span><span id="mission-title">MANEUVER EXERCISE<small id="mission-text">Select your force and cross the river by either bridge.</small></span></div>
         <div class="camera-tools" aria-label="Camera controls">
           <button id="zoom-in" aria-label="Zoom in" title="Zoom in (+)">+</button>
           <output id="zoom-level" aria-label="Camera zoom">100%</output>
@@ -35,23 +35,34 @@
         <dialog id="field-guide" aria-labelledby="guide-title">
           <div class="guide-label">STEEL FRONT · FIELD MANUAL 01</div><button id="help-close" class="guide-close" aria-label="Close field guide">×</button>
           <h2 id="guide-title">Know your ground.</h2>
-          <p>You are surveying a 128 × 128 tile battlefield. Find river crossings, tree cover, open farmland, and routes through the sector.</p>
-          <dl class="guide-controls"><div><dt>W A S D / arrow keys</dt><dd>Pan camera · Shift for speed</dd></div><div><dt>Pointer at map edges</dt><dd>Edge scroll</dd></div><div><dt>Middle mouse drag</dt><dd>Drag the battlefield</dd></div><div><dt>Mouse wheel / + −</dt><dd>Zoom in and out</dd></div><div><dt>Click or drag minimap</dt><dd>Jump to a sector</dd></div><div><dt>Home</dt><dd>Return to starting position</dd></div><div><dt>G</dt><dd>Show tile grid</dd></div></dl>
-          <p class="guide-footnote">MILESTONE 0 · MAP & CAMERA<br>Units, base building, and combat arrive in later milestones.</p>
-          <button id="help-return" class="primary-button">RETURN TO RECON <span aria-hidden="true">→</span></button>
+          <p>Twenty mixed units wait on the west bank. Select them, then right-click to move. Forests, cottages, rocks and the river block ground units; the two bridges are one tile wide.</p>
+          <dl class="guide-controls"><div><dt>Left click / drag</dt><dd>Select unit / box select · Shift adds</dd></div><div><dt>Right click</dt><dd>Move selected units</dd></div><div><dt>Double click</dt><dd>Select visible units of that type</dd></div><div><dt>Ctrl+0–9 / 0–9</dt><dd>Store / recall group · tap twice to centre</dd></div><div><dt>X / Esc</dt><dd>Stop selected / clear selection</dd></div><div><dt>W A S D / arrow keys</dt><dd>Pan camera · Shift for speed</dd></div><div><dt>Pointer at map edges</dt><dd>Edge scroll</dd></div><div><dt>Middle mouse drag</dt><dd>Drag the battlefield</dd></div><div><dt>Mouse wheel / + −</dt><dd>Zoom in and out</dd></div><div><dt>Click or drag minimap</dt><dd>Jump to a sector</dd></div><div><dt>Home</dt><dd>Return to starting position</dd></div><div><dt>G</dt><dd>Show tile grid</dd></div></dl>
+          <p class="guide-footnote">MILESTONE 1 · UNITS & CONTROL<br>Economy, base building and combat arrive in later milestones.</p>
+          <button id="help-return" class="primary-button">RETURN TO FIELD <span aria-hidden="true">→</span></button>
         </dialog>
       </main>
       <footer class="command-bar">
-        <section class="terrain-panel" aria-label="Terrain information">
+        <section class="info-slot">
+          <div class="terrain-panel" id="terrain-panel" aria-label="Terrain information">
           <div class="terrain-portrait" id="terrain-portrait"><svg viewBox="0 0 100 100" aria-hidden="true"><path class="portrait-ground" d="M8 56 50 34 92 56 50 80Z"/><path class="portrait-ground-side" d="m8 56 42 24 42-24v9L50 90 8 65Z"/><path class="portrait-tree-trunk" d="M48 33h5v27h-5z"/><path class="portrait-tree" d="m50 14 15 25-8-2 13 17-20-4-20 4 13-17-8 2z"/><path class="portrait-grass" d="m19 60 4-7m0 9 3-6m47 8 3-9m1 11 4-6"/></svg><span>GROUND INTEL</span></div>
           <div class="terrain-info"><span class="eyebrow">TERRAIN SURVEY</span><h2 id="terrain-name">Open ground</h2><p id="terrain-description">Clear terrain. Room to maneuver.</p><span class="terrain-tag" id="terrain-tag">PASSABLE</span><span class="tile-coordinate" id="tile-coordinate">—</span></div>
+          </div>
+          <div class="selection-panel" id="selection-panel" aria-label="Selected units" aria-live="polite" hidden>
+            <div class="unit-portrait"><canvas id="unit-portrait" width="94" height="88" aria-hidden="true"></canvas><span id="selection-count">1 UNIT</span></div>
+            <div class="selection-info"><span class="eyebrow" id="selection-eyebrow">SELECTED</span><h2 id="selection-name">—</h2><div class="hp-bar"><i id="selection-hp"></i></div><p id="selection-status">—</p><div class="selection-types" id="selection-types"></div></div>
+          </div>
         </section>
-        <section class="operation-panel" aria-label="Current operation">
-          <span class="eyebrow">COMMAND POST</span><div class="operation-title">The front is yours to explore.</div><p>Move the camera to survey the battlefield.</p><div class="control-hints"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> pan</span><span><svg viewBox="0 0 14 18" aria-hidden="true"><rect x="2" y="1" width="10" height="16" rx="5"/><path d="M7 4v4"/></svg> scroll to zoom</span><span><span class="mini-cross" aria-hidden="true">⌖</span> minimap to jump</span></div>
+        <section class="operation-panel" id="command-panel" aria-label="Commands">
+          <span class="eyebrow" id="command-eyebrow">EXERCISE ORDERS</span><div class="operation-title" id="command-title">Maneuver Exercise</div><p id="command-text">Drag to select · right-click to move · Ctrl+0–9 to group.</p>
+          <div class="command-buttons" id="command-buttons">
+            <button id="scenario-reset" class="command-button" title="Restart the 20-unit maneuver exercise">RESET EXERCISE</button>
+            <button id="scenario-stress" class="command-button" title="Load the 200-unit movement stress test">STRESS 200</button>
+            <button id="order-stop" class="command-button" title="Stop selected units (X)">STOP <kbd>X</kbd></button>
+          </div>
         </section>
         <section class="minimap-panel" aria-label="Tactical minimap"><div class="minimap-header"><span>SECTOR OVERVIEW</span><span class="map-size">128 × 128</span></div><canvas id="minimap" aria-label="Tactical minimap. Click or drag to move the camera." tabindex="0"></canvas><span class="north-marker" aria-hidden="true">N <span>↑</span></span></section>
       </footer>
-      <div class="bottom-line"><span>STEEL FRONT <span class="bottom-line-muted">/</span> FIELD BUILD 0.1</span><span>MAP & CAMERA <span class="bottom-line-muted">·</span> PROCEDURAL BATTLEFIELD</span><span id="map-seed">SEED —</span></div>
+      <div class="bottom-line"><span>STEEL FRONT <span class="bottom-line-muted">/</span> FIELD BUILD 0.2</span><span id="bottom-mode">UNITS & CONTROL <span class="bottom-line-muted">·</span> MANEUVER EXERCISE</span><span id="map-seed">SEED —</span></div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

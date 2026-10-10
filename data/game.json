@@ -1,0 +1,12 @@
+{
+  "ticksPerSecond": 20,
+  "subTile": 1024,
+  "pathBudgetPerTick": 30000,
+  "shoveDelayTicks": 3,
+  "headOnShoveTicks": 2,
+  "jamShoveTicks": 30,
+  "repathBlockedTicks": 40,
+  "noProgressTicks": 160,
+  "yieldSearchNodes": 600,
+  "dynamicRepathRadius": 8
+}

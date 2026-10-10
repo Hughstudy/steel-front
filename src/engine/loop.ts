@@ -17,7 +17,22 @@ export class FixedClock {
   clearAccumulator(): void { this.accumulator = 0; }
 }
 
+/**
+ * One display frame. While the page is hidden (or gameplay is paused) no tick
+ * runs and partial time is discarded, so returning never replays hidden time.
+ */
+export function advanceFrame(clock: FixedClock, elapsed: number, paused: boolean,
+  update: (dt: number, tick: number) => void): number {
+  if (paused) {
+    clock.clearAccumulator();
+    return 0;
+  }
+  return clock.advance(elapsed, update);
+}
+
 export class GameLoop {
+  /** Extra pause predicate (menus, modal pause). Hidden pages always pause. */
+  paused: () => boolean = () => false;
   readonly clock = new FixedClock();
   private lastTime = 0;
   private requestId = 0;
@@ -53,7 +68,7 @@ export class GameLoop {
     if (!this.running) return;
     const elapsed = (now - this.lastTime) / 1000;
     this.lastTime = now;
-    const alpha = this.clock.advance(elapsed, this.update);
+    const alpha = advanceFrame(this.clock, elapsed, document.hidden || this.paused(), this.update);
     this.render(alpha, Math.min(elapsed, 0.05));
     this.requestId = requestAnimationFrame(this.frame);
   };

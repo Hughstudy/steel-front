@@ -1,6 +1,6 @@
 # Steel Front
 
-WW2-themed, isometric browser RTS. **Current milestone: M0 — map & camera**, an interactive terrain reconnaissance build. Units and combat arrive in later milestones.
+WW2-themed, isometric browser RTS. **Current milestone: M1 — units & control**: select and maneuver a 20-unit force across the Lowlands (a 200-unit stress scenario is one click away). Economy, base building and combat arrive in later milestones.
 
 Requires Node.js 22.12+ (tested with Node 26) and npm.
 
@@ -13,7 +13,7 @@ npm run build
 
 Open the URL printed by Vite. `npm run preview` serves the production build locally.
 
-Controls: WASD / arrows or map-edge scroll to pan, Shift for faster pan, mouse wheel or +/− to zoom, middle mouse drag to pan, minimap click/drag to jump, Home / Space to return to the starting sector, G to toggle tile grid. Controls are also available in the HUD.
+Controls: left click / drag to select (Shift adds), double-click selects a type, right-click moves, Ctrl+0–9 / 0–9 groups, X stops. WASD / arrows or map-edge scroll to pan, Shift for faster pan, mouse wheel or +/− to zoom, middle mouse drag to pan, minimap click/drag to jump, Home / Space to return to the starting sector, G to toggle tile grid. Controls are also available in the HUD.
 
 The seeded map contains 16,384 tiles. Terrain generation is deterministic. The renderer caches ground chunks, culls offscreen terrain/scenery, and reuses scenery sprites; simulation ticks at 20 Hz separately from rendering.
 

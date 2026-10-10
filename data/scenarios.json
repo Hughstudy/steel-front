@@ -1,0 +1,42 @@
+[
+  {
+    "id": "m1-maneuvers",
+    "name": "Maneuver Exercise",
+    "description": "Twenty mixed units on the west bank. Select them and cross the river by either bridge.",
+    "map": "lowlands",
+    "camera": { "x": 38, "y": 60 },
+    "players": [
+      {
+        "faction": "allies",
+        "credits": 0,
+        "anchor": { "x": 38, "y": 60 },
+        "units": [
+          { "type": "allied_rifle", "count": 8 },
+          { "type": "allied_light_tank", "count": 4 },
+          { "type": "allied_halftrack", "count": 4 },
+          { "type": "allied_truck", "count": 4 }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "m1-stress",
+    "name": "Movement Stress (200)",
+    "description": "Two hundred units for pathfinding and rendering profiling.",
+    "map": "lowlands",
+    "camera": { "x": 36, "y": 60 },
+    "players": [
+      {
+        "faction": "allies",
+        "credits": 0,
+        "anchor": { "x": 36, "y": 60 },
+        "units": [
+          { "type": "allied_rifle", "count": 80 },
+          { "type": "allied_light_tank", "count": 40 },
+          { "type": "allied_halftrack", "count": 40 },
+          { "type": "allied_truck", "count": 40 }
+        ]
+      }
+    ]
+  }
+]

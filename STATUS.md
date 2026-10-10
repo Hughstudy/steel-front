@@ -1,5 +1,26 @@
 # Steel Front status
 
+## Done — M1: Units & control
+Completed 2026-10-10. Playable "Maneuver Exercise": 20 mixed Allied units (8 rifle squads, 4 Stuarts, 4 halftracks, 4 supply trucks) on the west bank, plus a labelled 200-unit stress scenario. Both are reachable from HUD buttons.
+
+- Data-driven, validated rules: `data/game.json`, `terrain.json`, `factions.json`, `units.json`, `scenarios.json`.
+- Headless deterministic `World`: fixed-point positions, tick-stamped commands, atomic budgeted A* jobs, distance-field heuristic, formation slots, tile reservations, shove/yield with aging priority, and no-progress recovery.
+- Procedural 16-direction unit sprites, with turrets and infantry walk frames, interleaved with scenery depth.
+- Selection: click, Shift toggle, box drag, double-click by type, Ctrl+0–9 / 0–9 groups (double tap centres), right-click move with marker feedback, X stop, Esc clear, cursor feedback, selection panel and minimap dots.
+- Gameplay pauses while the page is hidden; resuming never replays hidden time.
+- Details and evidence: `docs/verification/M1.md`.
+
+## Verification (M1)
+- `npm test`: 28/28 pass. `npm run build`: pass.
+- Headless acceptance: 20 units crossed both bridges and back; head-on bridge traffic, rapid re-orders, a map-edge crowd and a water click all settle; 200 units cross the map. The tests check occupancy invariants.
+- Browser (dev and production preview): selection, groups, double-click, Shift, right-click and zoom-limit hit testing were exercised with real input. No console errors.
+- Not measured: 60 Hz frame intervals (the browser pane was hidden, so rAF was throttled). A CPU benchmark is recorded instead.
+
+## Next — M2: Economy
+Supply dumps; truck fill → haul → deposit loop; HQ/depot fixture; money; engineer oil-derrick capture.
+
+---
+
 ## Done — M0: Map & camera
 Completed 2026-10-10 (Asia/Singapore). Playable reconnaissance build; no later milestone work started.
 
@@ -28,7 +49,7 @@ Completed 2026-10-10 (Asia/Singapore). Playable reconnaissance build; no later m
 - This is a documentation-only handoff. M0 remains the only implemented milestone; no M1 runtime work has begun.
 - Handoff check: existing 13 tests and the production build still pass; no browser re-test was needed for these documentation-only changes.
 
-## Next — M1 (next session)
+## (historical) M1 plan
 - Data-driven unit definitions including future cost/build time/prerequisite fields.
 - Render animated directional units; box select and right-click move.
 - Grid A*, unit avoidance/recovery, and formation spread.

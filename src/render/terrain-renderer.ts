@@ -1,6 +1,7 @@
 import type { CameraView, MapConfig, TerrainMap } from '../types';
 import { createGroundAtlas, paintRoad } from './ground';
 import { createPropAtlas } from './props';
+import type { DepthLayer } from './entity-layer';
 
 interface GroundChunk {
   canvas: HTMLCanvasElement;
@@ -76,7 +77,7 @@ export class TerrainRenderer {
     };
   }
 
-  render(view: CameraView, timeSeconds: number, showGrid: boolean): void {
+  render(view: CameraView, timeSeconds: number, showGrid: boolean, layer: DepthLayer | null = null): void {
     const context = this.context;
     const dpr = this.canvas.width / view.width;
     const scale = dpr * view.zoom;
@@ -110,6 +111,8 @@ export class TerrainRenderer {
     const shimmer = Math.sin(timeSeconds * .65) * .045 + .055;
 
     for (let diagonal = minX + minY; diagonal <= maxX + maxY; diagonal++) {
+      // Entities whose ground point is behind this diagonal's tile centres draw first.
+      if (layer) layer.drawUpTo(context, diagonal + 1);
       const startY = Math.max(minY, diagonal - maxX);
       const endY = Math.min(maxY, diagonal - minX);
       for (let y = startY; y <= endY; y++) {
@@ -130,6 +133,7 @@ export class TerrainRenderer {
         }
       }
     }
+    if (layer) layer.drawRest(context);
     if (showGrid) this.drawGrid(context, minX, maxX, minY, maxY, view.zoom);
   }
 

@@ -1,0 +1,26 @@
+[
+  {
+    "id": "allies",
+    "name": "Allies",
+    "insignia": "star",
+    "hull": "#6b6f45",
+    "hullDark": "#4d5233",
+    "hullLight": "#8b8e5d",
+    "trim": "#e9e6d6",
+    "team": "#c9b458",
+    "cloth": "#7a7350",
+    "skin": "#d2ab83"
+  },
+  {
+    "id": "axis",
+    "name": "Axis",
+    "insignia": "cross",
+    "hull": "#6b706e",
+    "hullDark": "#4b504f",
+    "hullLight": "#8c918d",
+    "trim": "#1c1d1d",
+    "team": "#b55444",
+    "cloth": "#5f655f",
+    "skin": "#d0a985"
+  }
+]

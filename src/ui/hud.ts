@@ -1,5 +1,6 @@
 import type { CameraView, MapConfig, TerrainMap } from '../types.ts';
 import { Minimap } from './minimap.ts';
+import type { MinimapDots } from './minimap.ts';
 import './styles.css';
 
 interface HudActions {
@@ -111,5 +112,5 @@ export class Hud {
     if (trunk) trunk.style.opacity = id === 1 ? '1' : '0';
   }
 
-  renderMinimap(view: CameraView): void { this.minimap.render(view); }
+  renderMinimap(view: CameraView, dots: MinimapDots | null = null): void { this.minimap.render(view, dots); }
 }
