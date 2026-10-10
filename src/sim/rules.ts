@@ -47,12 +47,49 @@ export interface UnitDef {
 }
 
 export interface ScenarioUnitGroup { type: string; count: number }
+export interface ScenarioBuilding { type: string; spawn: number }
 export interface ScenarioPlayer {
   faction: string; credits: number; anchor: { x: number; y: number }; units: ScenarioUnitGroup[];
+  buildings: ScenarioBuilding[];
 }
 export interface ScenarioDef {
   id: string; name: string; description: string; map: string;
   camera: { x: number; y: number }; players: ScenarioPlayer[];
+  /** Place the map preset's supply dumps and oil derricks. */
+  resources: boolean;
+}
+
+export interface BuildingCapabilities {
+  /** Accepts truck deliveries. */
+  depot?: boolean;
+  /** Strategic objective (HQ). */
+  objective?: boolean;
+  /** Supply stock held by a dump (credits). */
+  supply?: number;
+  /** Pays oil income to its owner. */
+  oil?: boolean;
+  /** Engineers may capture it. */
+  capturable?: boolean;
+  [key: string]: unknown;
+}
+
+export interface BuildingDef {
+  id: string; faction: string; name: string; cost: number; hp: number;
+  footprint: { w: number; h: number }; buildTicks: number; prerequisites: string[];
+  producer: string | null; power: number; vision: number; dockSlots: number; sellable: boolean;
+  capabilities: BuildingCapabilities; visual: UnitVisual;
+}
+
+export interface EconomyRules {
+  loadPerTick: number; unloadPerTick: number; dockLeaseTicks: number; leaseTravelTicksPerTile: number;
+  retryTicks: number; oilIntervalTicks: number; oilPayout: number; captureTicks: number;
+}
+
+export interface MapPoint { x: number; y: number }
+export interface MapPreset {
+  id: string; name: string; seed: number; spawns: MapPoint[]; supplies: MapPoint[]; derricks: MapPoint[];
+  /** Building types placed at the supply and derrick points. */
+  supplyType: string; derrickType: string;
 }
 
 export interface Rules {
@@ -60,12 +97,19 @@ export interface Rules {
   terrain: TerrainRules;
   factions: Map<string, FactionDef>;
   units: Map<string, UnitDef>;
+  buildings: Map<string, BuildingDef>;
+  economy: EconomyRules;
+  maps: Map<string, MapPreset>;
   scenarios: Map<string, ScenarioDef>;
 }
 
 export interface RawRules {
   game: unknown; terrain: unknown; factions: unknown; units: unknown; scenarios: unknown;
+  buildings: unknown; economy: unknown; maps: unknown;
 }
+
+/** Owner faction id used for neutral map objects. */
+export const NEUTRAL = 'neutral';
 
 export const ARMOR_CLASSES = ['infantry', 'light', 'heavy', 'building'];
 
@@ -209,6 +253,70 @@ export function loadRules(raw: RawRules): Rules {
     units.set(def.id, def);
   });
 
+  const buildings = new Map<string, BuildingDef>();
+  check.array(raw.buildings, 'buildings').forEach((item, index) => {
+    const r = check.object(item, `buildings[${index}]`);
+    const where = `buildings[${typeof r.id === 'string' ? r.id : index}]`;
+    const footprint = check.array(r.footprint, `${where}.footprint`);
+    const w = typeof footprint[0] === 'number' ? footprint[0] : 0;
+    const h = typeof footprint[1] === 'number' ? footprint[1] : 0;
+    if (footprint.length !== 2 || !Number.isInteger(w) || !Number.isInteger(h) || w < 1 || h < 1 || w > 6 || h > 6) {
+      check.errors.push(`${where}.footprint: expected [w, h] integers in 1..6`);
+    }
+    const def: BuildingDef = {
+      id: check.string(r, 'id', where), faction: check.string(r, 'faction', where), name: check.string(r, 'name', where),
+      cost: check.number(r, 'cost', where, 0, 100000, true), hp: check.number(r, 'hp', where, 1, 100000, true),
+      footprint: { w: Math.max(1, w), h: Math.max(1, h) }, buildTicks: check.number(r, 'buildTicks', where, 1, 100000, true),
+      prerequisites: check.strings(r, 'prerequisites', where),
+      producer: r.producer === null ? null : check.string(r, 'producer', where),
+      power: check.number(r, 'power', where, -1000, 1000, true), vision: check.number(r, 'vision', where, 0, 20, true),
+      dockSlots: check.number(r, 'dockSlots', where, 0, 8, true), sellable: check.bool(r, 'sellable', where),
+      capabilities: check.object(r.capabilities, `${where}.capabilities`) as BuildingCapabilities,
+      visual: visualOf(check, check.object(r.visual, `${where}.visual`), `${where}.visual`),
+    };
+    if (buildings.has(def.id) || units.has(def.id)) check.errors.push(`${where}: duplicate id ${def.id}`);
+    if (def.faction !== NEUTRAL && !factions.has(def.faction)) check.errors.push(`${where}.faction: unknown faction ${def.faction}`);
+    const supply = def.capabilities.supply;
+    if (supply !== undefined && (typeof supply !== 'number' || !Number.isInteger(supply) || supply < 0)) check.errors.push(`${where}.capabilities.supply: expected a non-negative integer`);
+    buildings.set(def.id, def);
+  });
+  for (const unit of units.values()) {
+    const cargo = unit.capabilities.cargo;
+    if (cargo !== undefined && (typeof cargo !== 'number' || !Number.isInteger(cargo) || cargo <= 0)) check.errors.push(`units[${unit.id}].capabilities.cargo: expected a positive integer`);
+  }
+
+  const e = check.object(raw.economy, 'economy');
+  const economy: EconomyRules = {
+    loadPerTick: check.number(e, 'loadPerTick', 'economy', 1, 10000, true),
+    unloadPerTick: check.number(e, 'unloadPerTick', 'economy', 1, 10000, true),
+    dockLeaseTicks: check.number(e, 'dockLeaseTicks', 'economy', 1, 100000, true),
+    leaseTravelTicksPerTile: check.number(e, 'leaseTravelTicksPerTile', 'economy', 1, 1000, true),
+    retryTicks: check.number(e, 'retryTicks', 'economy', 1, 10000, true),
+    oilIntervalTicks: check.number(e, 'oilIntervalTicks', 'economy', 1, 100000, true),
+    oilPayout: check.number(e, 'oilPayout', 'economy', 0, 100000, true),
+    captureTicks: check.number(e, 'captureTicks', 'economy', 1, 100000, true),
+  };
+
+  const maps = new Map<string, MapPreset>();
+  const points = (value: unknown, where: string): MapPoint[] => check.array(value, where).map((p, i) => {
+    const pr = check.object(p, `${where}[${i}]`);
+    return { x: check.number(pr, 'x', `${where}[${i}]`, 0, 1023, true), y: check.number(pr, 'y', `${where}[${i}]`, 0, 1023, true) };
+  });
+  check.array(raw.maps, 'maps').forEach((item, index) => {
+    const r = check.object(item, `maps[${index}]`);
+    const where = `maps[${typeof r.id === 'string' ? r.id : index}]`;
+    const preset: MapPreset = {
+      id: check.string(r, 'id', where), name: check.string(r, 'name', where), seed: check.number(r, 'seed', where, 0, 2 ** 31, true),
+      spawns: points(r.spawns, `${where}.spawns`), supplies: points(r.supplies, `${where}.supplies`), derricks: points(r.derricks, `${where}.derricks`),
+      supplyType: check.string(r, 'supplyType', where), derrickType: check.string(r, 'derrickType', where),
+    };
+    if (!buildings.has(preset.supplyType)) check.errors.push(`${where}.supplyType: unknown building ${preset.supplyType}`);
+    if (!buildings.has(preset.derrickType)) check.errors.push(`${where}.derrickType: unknown building ${preset.derrickType}`);
+    if (preset.spawns.length < 2) check.errors.push(`${where}.spawns: need at least two player spawns`);
+    if (maps.has(preset.id)) check.errors.push(`${where}: duplicate map id ${preset.id}`);
+    maps.set(preset.id, preset);
+  });
+
   const scenarios = new Map<string, ScenarioDef>();
   check.array(raw.scenarios, 'scenarios').forEach((item, index) => {
     const r = check.object(item, `scenarios[${index}]`);
@@ -216,7 +324,7 @@ export function loadRules(raw: RawRules): Rules {
     const camera = check.object(r.camera, `${where}.camera`);
     const def: ScenarioDef = {
       id: check.string(r, 'id', where), name: check.string(r, 'name', where), description: check.string(r, 'description', where),
-      map: check.string(r, 'map', where),
+      map: check.string(r, 'map', where), resources: r.resources === true,
       camera: { x: check.number(camera, 'x', `${where}.camera`, 0, 1023), y: check.number(camera, 'y', `${where}.camera`, 0, 1023) },
       players: check.array(r.players, `${where}.players`).map((p, pi) => {
         const pw = `${where}.players[${pi}]`;
@@ -227,6 +335,13 @@ export function loadRules(raw: RawRules): Rules {
         return {
           faction, credits: check.number(pr, 'credits', pw, 0, 1_000_000, true),
           anchor: { x: check.number(anchor, 'x', `${pw}.anchor`, 0, 1023, true), y: check.number(anchor, 'y', `${pw}.anchor`, 0, 1023, true) },
+          buildings: check.array(pr.buildings ?? [], `${pw}.buildings`).map((b, bi) => {
+            const bw = `${pw}.buildings[${bi}]`;
+            const br = check.object(b, bw);
+            const type = check.string(br, 'type', bw);
+            if (!buildings.has(type)) check.errors.push(`${bw}.type: unknown building ${type}`);
+            return { type, spawn: check.number(br, 'spawn', bw, 0, 7, true) };
+          }),
           units: check.array(pr.units, `${pw}.units`).map((u, ui) => {
             const uw = `${pw}.units[${ui}]`;
             const ur = check.object(u, uw);
@@ -237,10 +352,11 @@ export function loadRules(raw: RawRules): Rules {
         };
       }),
     };
+    if (!maps.has(def.map)) check.errors.push(`${where}.map: unknown map ${def.map}`);
     if (scenarios.has(def.id)) check.errors.push(`${where}: duplicate scenario id ${def.id}`);
     scenarios.set(def.id, def);
   });
 
   if (check.errors.length) throw new RulesError(check.errors);
-  return { game, terrain, factions, units, scenarios };
+  return { game, terrain, factions, units, buildings, economy, maps, scenarios };
 }

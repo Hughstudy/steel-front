@@ -1,0 +1,10 @@
+{
+  "loadPerTick": 10,
+  "unloadPerTick": 20,
+  "dockLeaseTicks": 160,
+  "leaseTravelTicksPerTile": 40,
+  "retryTicks": 40,
+  "oilIntervalTicks": 100,
+  "oilPayout": 25,
+  "captureTicks": 80
+}

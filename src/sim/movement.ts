@@ -205,6 +205,8 @@ function avoidanceFor(unit: Entity): number[] {
  */
 export function shove(world: World, target: Entity, requester: Entity, avoid: number[]): boolean {
   if (target.next >= 0 || target.yieldPath || target.kind !== 'unit') return false;
+  // Trucks docked at work and engineers mid-capture finish quickly; wait rather than evict them.
+  if (target.task === 'load' || target.task === 'unload' || (target.task === 'capture' && target.timer > 0)) return false;
   const def = world.rules.units.get(target.type);
   if (!def || def.movement !== 'ground') return false;
   const route = world.search.yieldRoute(world, target.tile, requester, avoid, world.rules.game.yieldSearchNodes);

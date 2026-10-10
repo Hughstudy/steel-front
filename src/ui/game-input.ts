@@ -17,6 +17,8 @@ export interface GameInputHost {
   primaryAction?(tileX: number, tileY: number): boolean;
   cancelAction?(): boolean;
   selectable(entity: Entity): boolean;
+  /** Left-click on something the player cannot select (neutral or enemy): show its details. */
+  inspect?(entity: Entity | null): void;
 }
 
 const DRAG_THRESHOLD = 6;
@@ -136,6 +138,8 @@ export class GameInput {
     this.camera.screenToWorld(this.pointerX, this.pointerY, this.scratch);
     const entity = this.layer.pick(this.scratch.x, this.scratch.y, e => this.host.selectable(e));
     if (!entity) {
+      const other = shift ? null : this.layer.pick(this.scratch.x, this.scratch.y, () => true);
+      this.host.inspect?.(other);
       if (!shift) this.selection.clear();
       this.lastClickType = '';
       return;
@@ -147,6 +151,7 @@ export class GameInput {
       this.lastClickTime = -1e9;
       return;
     }
+    this.host.inspect?.(null);
     this.lastClickTime = time;
     this.lastClickType = entity.type;
     if (shift) this.selection.toggle(entity.id);
@@ -159,6 +164,7 @@ export class GameInput {
     this.camera.screenToWorld(Math.min(this.box.x0, this.box.x1), Math.min(this.box.y0, this.box.y1), a);
     this.camera.screenToWorld(Math.max(this.box.x0, this.box.x1), Math.max(this.box.y0, this.box.y1), b);
     const found = this.layer.inRect(a.x, a.y, b.x, b.y, e => this.host.selectable(e) && e.kind === 'unit').map(e => e.id);
+    this.host.inspect?.(null);
     if (shift) this.selection.add(found);
     else if (found.length > 0) this.selection.set(found);
     else this.selection.clear();

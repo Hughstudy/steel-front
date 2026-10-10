@@ -181,3 +181,5 @@ dialog p{color:#c0ccb2;font-size:12px;line-height:1.7}
 #battlefield.cursor-select{cursor:pointer}
 #battlefield.cursor-move{cursor:cell}
 #battlefield.cursor-invalid{cursor:not-allowed}
+#battlefield.cursor-harvest{cursor:copy}
+#battlefield.cursor-capture{cursor:alias}

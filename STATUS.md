@@ -1,5 +1,22 @@
 # Steel Front status
 
+## Done — M2: Economy
+Completed 2026-10-10. Playable "Logistics Exercise" (default scenario): an HQ fixture, three supply trucks, an engineer and two rifle squads, with 10 supply dumps and 4 oil derricks placed from `data/maps.json`.
+
+- Integer stock/cargo/credits; truck hauling state machine with dock leases, deterministic target choice and readable idle reasons; engineer capture; oil income; per-player ledger.
+- Context right-click (haul / unload / capture), FUNDS counter, structure intel panel, cargo and capture progress bars.
+- Details and evidence: `docs/verification/M2.md`.
+
+## Verification (M2)
+- `npm test`: 37/37 pass. `npm run build`: pass.
+- Browser dev and preview: capture and haul orders were issued with real clicks. A 5-minute untouched preview run produced 9200 credits, which equals the ledger exactly. No console messages.
+- Not measured: real-time frame pacing (the pane was hidden).
+
+## Next — M3: Base building
+MCV deploy → HQ; power plant, barracks, war factory; production queues; power; placement ghost; rally; sell/repair.
+
+---
+
 ## Done — M1: Units & control
 Completed 2026-10-10. Playable "Maneuver Exercise": 20 mixed Allied units (8 rifle squads, 4 Stuarts, 4 halftracks, 4 supply trucks) on the west bank, plus a labelled 200-unit stress scenario. Both are reachable from HUD buttons.
 
@@ -15,9 +32,6 @@ Completed 2026-10-10. Playable "Maneuver Exercise": 20 mixed Allied units (8 rif
 - Headless acceptance: 20 units crossed both bridges and back; head-on bridge traffic, rapid re-orders, a map-edge crowd and a water click all settle; 200 units cross the map. The tests check occupancy invariants.
 - Browser (dev and production preview): selection, groups, double-click, Shift, right-click and zoom-limit hit testing were exercised with real input. No console errors.
 - Not measured: 60 Hz frame intervals (the browser pane was hidden, so rAF was throttled). A CPU benchmark is recorded instead.
-
-## Next — M2: Economy
-Supply dumps; truck fill → haul → deposit loop; HQ/depot fixture; money; engineer oil-derrick capture.
 
 ---
 

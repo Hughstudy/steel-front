@@ -14,6 +14,61 @@ export const REASON_TEXT: Record<string, string> = {
   yielding: 'giving way',
 };
 
+export const TASK_TEXT: Record<string, string> = {
+  'seek-dump': 'looking for supplies',
+  'seek-depot': 'returning to depot',
+  'to-dump': 'driving to supply dump',
+  'to-depot': 'hauling to depot',
+  load: 'loading supplies',
+  unload: 'unloading',
+  capture: 'capture order',
+};
+
+export const STATUS_TEXT: Record<string, string> = {
+  'no-resource': 'no reachable supplies',
+  'no-depot': 'no depot to unload at',
+  queued: 'waiting for a free dock',
+  capturing: 'capturing',
+  approaching: 'moving to capture',
+  'already captured': 'target already captured',
+  'no-route': 'no route to target',
+};
+
+function maxHp(world: World, entity: Entity): number {
+  return entity.kind === 'unit' ? world.rules.units.get(entity.type)!.hp : world.rules.buildings.get(entity.type)!.hp;
+}
+
+function nameOf(world: World, type: string): string {
+  return world.rules.units.get(type)?.name ?? world.rules.buildings.get(type)?.name ?? type;
+}
+
+/** One-line activity description for a single entity. */
+export function describe(world: World, entity: Entity): string {
+  if (entity.kind === 'building') {
+    const def = world.rules.buildings.get(entity.type)!;
+    const owner = entity.owner < 0 ? 'NEUTRAL' : `PLAYER ${entity.owner + 1}`;
+    const parts = [owner];
+    if (typeof def.capabilities.supply === 'number') parts.push(`${entity.stock} / ${def.capabilities.supply} supplies`);
+    if (def.capabilities.oil) parts.push(entity.owner < 0 ? 'engineer can capture' : `+${world.rules.economy.oilPayout} every ${world.rules.economy.oilIntervalTicks / world.rules.game.ticksPerSecond}s`);
+    if (def.dockSlots > 0) parts.push(`docks ${entity.docks?.length ?? 0}/${def.dockSlots}`);
+    return parts.join(' · ');
+  }
+  const def = world.rules.units.get(entity.type)!;
+  const parts: string[] = [];
+  const cargo = def.capabilities.cargo;
+  if (typeof cargo === 'number') parts.push(`CARGO ${entity.cargo}/${cargo}`);
+  if (entity.task === 'capture' && entity.timer > 0) {
+    parts.push(`CAPTURING ${Math.round(100 * entity.timer / world.rules.economy.captureTicks)}%`);
+  } else if (entity.task && TASK_TEXT[entity.task]) {
+    parts.push(`${entity.auto ? 'AUTO · ' : ''}${TASK_TEXT[entity.task]}`);
+  } else {
+    parts.push(MOVE_STATE_NAMES[entity.moveState].toUpperCase());
+  }
+  if (entity.status && STATUS_TEXT[entity.status] && entity.status !== 'capturing' && entity.status !== 'approaching') parts.push(STATUS_TEXT[entity.status]);
+  else if (entity.reason && REASON_TEXT[entity.reason]) parts.push(REASON_TEXT[entity.reason]);
+  return parts.join(' · ');
+}
+
 function element<T extends HTMLElement>(id: string): T {
   const found = document.getElementById(id);
   if (!found) throw new Error(`Missing HUD element: ${id}`);
@@ -43,12 +98,14 @@ export class SelectionPanel {
     });
   }
 
-  update(world: World, selection: Selection, layer: EntityLayer): void {
+  update(world: World, selection: Selection, layer: EntityLayer, inspected: Entity | null = null): void {
     const members: Entity[] = [];
     for (const id of selection.ids) {
       const entity = world.get(id);
       if (entity) members.push(entity);
     }
+    const inspecting = members.length === 0 && inspected !== null;
+    if (inspecting) members.push(inspected);
     if (members.length === 0) {
       if (this.lastKey !== 'none') {
         this.terrain.hidden = false;
@@ -62,35 +119,34 @@ export class SelectionPanel {
     const lead = members[0];
     const def = world.rules.units.get(lead.type);
     let hp = 0;
-    let maxHp = 0;
+    let totalHp = 0;
     const counts = new Map<string, number>();
     for (const member of members) {
-      const d = world.rules.units.get(member.type);
       hp += member.hp;
-      maxHp += d ? d.hp : member.hp;
+      totalHp += maxHp(world, member);
       counts.set(member.type, (counts.get(member.type) ?? 0) + 1);
     }
-    const status = members.length === 1
-      ? `${MOVE_STATE_NAMES[lead.moveState].toUpperCase()}${lead.reason && REASON_TEXT[lead.reason] ? ` · ${REASON_TEXT[lead.reason]}` : ''}`
-      : summarize(members);
-    const key = `${selection.revision}|${lead.type}|${hp}|${status}`;
+    const status = members.length === 1 ? describe(world, lead) : summarize(members);
+    const key = `${selection.revision}|${lead.id}|${lead.owner}|${hp}|${status}`;
     if (key === this.lastKey) return;
     this.lastKey = key;
     this.terrain.hidden = true;
     this.panel.hidden = false;
-    this.count.textContent = `${members.length} UNIT${members.length === 1 ? '' : 'S'}`;
-    this.eyebrow.textContent = members.length === 1 ? `${(world.players[lead.owner]?.faction ?? '').toUpperCase()} · ${def?.armor.toUpperCase() ?? ''}` : 'FORCE SELECTED';
-    this.name.textContent = members.length === 1 ? def?.name ?? lead.type : `${members.length} units`;
-    this.hp.style.width = `${Math.round(100 * hp / Math.max(1, maxHp))}%`;
+    this.count.textContent = inspecting ? 'INTEL' : lead.kind === 'building' ? 'STRUCTURE' : `${members.length} UNIT${members.length === 1 ? '' : 'S'}`;
+    const side = world.players[lead.owner]?.faction.toUpperCase() ?? 'NEUTRAL';
+    this.eyebrow.textContent = members.length === 1 ? `${side} · ${def ? def.armor.toUpperCase() : 'STRUCTURE'}` : 'FORCE SELECTED';
+    this.name.textContent = members.length === 1 ? nameOf(world, lead.type) : `${members.length} units`;
+    this.hp.style.width = `${Math.round(100 * hp / Math.max(1, totalHp))}%`;
     this.status.textContent = status;
-    const typeKey = Array.from(counts).join(',');
+    const typeKey = `${lead.owner}|${Array.from(counts).join(',')}`;
     if (typeKey !== this.lastTypes) {
       this.lastTypes = typeKey;
       this.types.replaceChildren(...Array.from(counts).map(([type, n]) => {
         const button = document.createElement('button');
         button.dataset.type = type;
         button.title = 'Select only this type';
-        button.textContent = `${world.rules.units.get(type)?.name ?? type} ×${n}`;
+        button.textContent = `${nameOf(world, type)} ×${n}`;
+        button.disabled = inspecting;
         return button;
       }));
       this.drawPortrait(world, lead, layer);
@@ -101,6 +157,13 @@ export class SelectionPanel {
     const context = this.portrait.getContext('2d')!;
     context.setTransform(1, 0, 0, 1, 0, 0);
     context.clearRect(0, 0, this.portrait.width, this.portrait.height);
+    if (entity.kind === 'building') {
+      const sprite = layer.buildingFor(world, entity);
+      const scale = Math.min(88 / sprite.canvas.width, 80 / sprite.canvas.height);
+      context.setTransform(scale, 0, 0, scale, 47 - sprite.canvas.width * scale / 2, 84 - sprite.canvas.height * scale);
+      context.drawImage(sprite.canvas, 0, 0);
+      return;
+    }
     const sprites = layer.spritesFor(world, entity);
     const scale = sprites.infantry ? 1.9 : 1.15;
     context.setTransform(scale, 0, 0, scale, 47, sprites.infantry ? 74 : 60);

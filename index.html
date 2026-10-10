@@ -12,17 +12,17 @@
       <header class="topbar">
         <div class="wordmark" aria-label="Steel Front"><span class="insignia" aria-hidden="true">✦</span><span>STEEL <b>FRONT</b></span></div>
         <span class="top-divider"></span>
-        <span class="mode"><i></i> <span id="mode-label">M1 <span class="mode-slash">/</span> MANEUVERS</span></span>
-        <div class="resources" aria-label="Resources unavailable during reconnaissance">
-          <span class="resource"><span class="resource-icon" aria-hidden="true">$</span><span class="resource-label">FUNDS</span><b>—</b></span>
-          <span class="resource"><span class="resource-icon power-icon" aria-hidden="true">ϟ</span><span class="resource-label">POWER</span><b>—</b></span>
+        <span class="mode"><i></i> <span id="mode-label">M2 <span class="mode-slash">/</span> LOGISTICS</span></span>
+        <div class="resources" aria-label="Resources">
+          <span class="resource"><span class="resource-icon" aria-hidden="true">$</span><span class="resource-label">FUNDS</span><b id="funds" aria-live="off">0</b></span>
+          <span class="resource"><span class="resource-icon power-icon" aria-hidden="true">ϟ</span><span class="resource-label">POWER</span><b id="power">—</b></span>
         </div>
         <button class="help-button" id="help-toggle" aria-label="Open controls and mission briefing" title="Controls and briefing">? <span>FIELD GUIDE</span></button>
       </header>
       <main id="viewport" aria-label="Battlefield viewport">
         <canvas id="battlefield" tabindex="0" aria-label="Isometric battlefield. Move the camera with WASD or the arrow keys. Scroll to zoom."></canvas>
         <div class="map-heading"><span class="eyebrow">EUROPEAN THEATER · 1944</span><h1 id="map-name">OPERATION GREENBRIDGE</h1><span class="map-subtitle" id="map-subtitle">Survey the ground. Know the battlefield.</span></div>
-        <div class="mission-note"><span class="mission-dot" aria-hidden="true"></span><span id="mission-title">MANEUVER EXERCISE<small id="mission-text">Select your force and cross the river by either bridge.</small></span></div>
+        <div class="mission-note"><span class="mission-dot" aria-hidden="true"></span><span id="mission-title">SUPPLY RUN<small id="mission-text">Haul supplies to headquarters.</small></span></div>
         <div class="camera-tools" aria-label="Camera controls">
           <button id="zoom-in" aria-label="Zoom in" title="Zoom in (+)">+</button>
           <output id="zoom-level" aria-label="Camera zoom">100%</output>
@@ -35,9 +35,9 @@
         <dialog id="field-guide" aria-labelledby="guide-title">
           <div class="guide-label">STEEL FRONT · FIELD MANUAL 01</div><button id="help-close" class="guide-close" aria-label="Close field guide">×</button>
           <h2 id="guide-title">Know your ground.</h2>
-          <p>Twenty mixed units wait on the west bank. Select them, then right-click to move. Forests, cottages, rocks and the river block ground units; the two bridges are one tile wide.</p>
-          <dl class="guide-controls"><div><dt>Left click / drag</dt><dd>Select unit / box select · Shift adds</dd></div><div><dt>Right click</dt><dd>Move selected units</dd></div><div><dt>Double click</dt><dd>Select visible units of that type</dd></div><div><dt>Ctrl+0–9 / 0–9</dt><dd>Store / recall group · tap twice to centre</dd></div><div><dt>X / Esc</dt><dd>Stop selected / clear selection</dd></div><div><dt>W A S D / arrow keys</dt><dd>Pan camera · Shift for speed</dd></div><div><dt>Pointer at map edges</dt><dd>Edge scroll</dd></div><div><dt>Middle mouse drag</dt><dd>Drag the battlefield</dd></div><div><dt>Mouse wheel / + −</dt><dd>Zoom in and out</dd></div><div><dt>Click or drag minimap</dt><dd>Jump to a sector</dd></div><div><dt>Home</dt><dd>Return to starting position</dd></div><div><dt>G</dt><dd>Show tile grid</dd></div></dl>
-          <p class="guide-footnote">MILESTONE 1 · UNITS & CONTROL<br>Economy, base building and combat arrive in later milestones.</p>
+          <p>Supply trucks haul crates from neutral supply dumps to your headquarters; each delivery adds funds. Engineers capture oil derricks, which pay a steady income. Forests, cottages, rocks and the river block ground units; the two bridges are one tile wide.</p>
+          <dl class="guide-controls"><div><dt>Left click / drag</dt><dd>Select unit / box select · Shift adds</dd></div><div><dt>Right click</dt><dd>Move · on a dump: haul · on HQ: unload · engineer on derrick: capture</dd></div><div><dt>Click neutral structure</dt><dd>Show its intel (stock, owner)</dd></div><div><dt>Double click</dt><dd>Select visible units of that type</dd></div><div><dt>Ctrl+0–9 / 0–9</dt><dd>Store / recall group · tap twice to centre</dd></div><div><dt>X / Esc</dt><dd>Stop selected / clear selection</dd></div><div><dt>W A S D / arrow keys</dt><dd>Pan camera · Shift for speed</dd></div><div><dt>Pointer at map edges</dt><dd>Edge scroll</dd></div><div><dt>Middle mouse drag</dt><dd>Drag the battlefield</dd></div><div><dt>Mouse wheel / + −</dt><dd>Zoom in and out</dd></div><div><dt>Click or drag minimap</dt><dd>Jump to a sector</dd></div><div><dt>Home</dt><dd>Return to starting position</dd></div><div><dt>G</dt><dd>Show tile grid</dd></div></dl>
+          <p class="guide-footnote">MILESTONE 2 · LOGISTICS<br>Base building and combat arrive in later milestones.</p>
           <button id="help-return" class="primary-button">RETURN TO FIELD <span aria-hidden="true">→</span></button>
         </dialog>
       </main>
@@ -53,16 +53,18 @@
           </div>
         </section>
         <section class="operation-panel" id="command-panel" aria-label="Commands">
-          <span class="eyebrow" id="command-eyebrow">EXERCISE ORDERS</span><div class="operation-title" id="command-title">Maneuver Exercise</div><p id="command-text">Drag to select · right-click to move · Ctrl+0–9 to group.</p>
+          <span class="eyebrow" id="command-eyebrow">EXERCISE ORDERS</span><div class="operation-title" id="command-title">Supply Run</div><p id="command-text">Right-click a dump with trucks · a derrick with engineers.</p>
           <div class="command-buttons" id="command-buttons">
-            <button id="scenario-reset" class="command-button" title="Restart the 20-unit maneuver exercise">RESET EXERCISE</button>
-            <button id="scenario-stress" class="command-button" title="Load the 200-unit movement stress test">STRESS 200</button>
+            <button data-scenario="m2-logistics" class="command-button" title="Restart the logistics exercise">LOGISTICS</button>
+            <button data-scenario="m1-maneuvers" class="command-button" title="Load the 20-unit maneuver exercise">MANEUVERS</button>
+            <button data-scenario="m1-stress" class="command-button" title="Load the 200-unit movement stress test">STRESS 200</button>
+            <button id="order-harvest" class="command-button" title="Send selected trucks to haul automatically">AUTO HAUL</button>
             <button id="order-stop" class="command-button" title="Stop selected units (X)">STOP <kbd>X</kbd></button>
           </div>
         </section>
         <section class="minimap-panel" aria-label="Tactical minimap"><div class="minimap-header"><span>SECTOR OVERVIEW</span><span class="map-size">128 × 128</span></div><canvas id="minimap" aria-label="Tactical minimap. Click or drag to move the camera." tabindex="0"></canvas><span class="north-marker" aria-hidden="true">N <span>↑</span></span></section>
       </footer>
-      <div class="bottom-line"><span>STEEL FRONT <span class="bottom-line-muted">/</span> FIELD BUILD 0.2</span><span id="bottom-mode">UNITS & CONTROL <span class="bottom-line-muted">·</span> MANEUVER EXERCISE</span><span id="map-seed">SEED —</span></div>
+      <div class="bottom-line"><span>STEEL FRONT <span class="bottom-line-muted">/</span> FIELD BUILD 0.3</span><span id="bottom-mode">LOGISTICS <span class="bottom-line-muted">·</span> SUPPLY RUN</span><span id="map-seed">SEED —</span></div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

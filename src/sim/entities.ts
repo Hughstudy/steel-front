@@ -10,7 +10,10 @@ export const MoveState = {
 export type MoveStateValue = typeof MoveState[keyof typeof MoveState];
 export const MOVE_STATE_NAMES = ['Idle', 'Awaiting route', 'Moving', 'Waiting', 'Arrived', 'Unreachable'];
 
-export type EntityKind = 'unit' | 'building' | 'resource';
+export type EntityKind = 'unit' | 'building';
+
+/** A bounded docking reservation at a dump or depot. */
+export interface DockLease { truck: number; tile: number; until: number }
 
 /**
  * Authoritative entity record. Plain data only (no references to other
@@ -55,6 +58,23 @@ export interface Entity {
   repath: number;
   /** Distance travelled in fixed-point units, used only for presentation (walk cycles). */
   odometer: number;
+  /** Economy: cargo carried (trucks) or stock remaining (dumps), in credits. */
+  cargo: number;
+  stock: number;
+  /** Autonomous task (truck hauling, engineer capture); '' when idle. */
+  task: string;
+  /** Entity id the task is aimed at (-1 none). */
+  target: number;
+  /** Player-preferred task target (-1 none). */
+  preferred: number;
+  /** Generic task counter: retry delay or capture progress, in ticks. */
+  timer: number;
+  /** Readable task status for the HUD. */
+  status: string;
+  /** True while a truck autonomously hauls. */
+  auto: boolean;
+  /** Dock leases held at this building. */
+  docks: DockLease[] | null;
 }
 
 export function createEntity(id: number, kind: EntityKind, type: string, owner: number, hp: number): Entity {
@@ -65,5 +85,6 @@ export function createEntity(id: number, kind: EntityKind, type: string, owner: 
     path: null, pathIndex: 0, goal: -1, orderId: 0,
     moveState: MoveState.Idle, reason: '', blocked: 0, waitTotal: 0, lastProgress: 0,
     yieldPath: null, yieldIndex: 0, yieldAvoid: null, resume: false, repath: 0, odometer: 0,
+    cargo: 0, stock: 0, task: '', target: -1, preferred: -1, timer: 0, status: '', auto: false, docks: null,
   };
 }

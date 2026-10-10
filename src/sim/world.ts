@@ -8,12 +8,16 @@ import { LocalSearch } from './local-search.ts';
 import { updateGroundUnit } from './movement.ts';
 import { NavigationGrid } from './navigation-grid.ts';
 import { Pathfinder, UNREACHED } from './pathfinder.ts';
-import type { Rules, ScenarioDef } from './rules.ts';
+import type { BuildingDef, Rules, ScenarioDef } from './rules.ts';
+import { findPlacement, footprintTiles } from './structures.ts';
+import { updateEconomy, releaseDock, cancelTask } from './economy.ts';
 
 export interface Player {
   index: number;
   faction: string;
   credits: number;
+  /** Audit trail: every credit that entered or left this player's account. */
+  ledger: { delivered: number; oil: number; spent: number; refunded: number };
 }
 
 export interface PathJob {
@@ -40,11 +44,15 @@ export class World {
   readonly search: LocalSearch;
   readonly subTile: number;
   readonly random: Random;
+  /** Static buildability from terrain and scenery (structures checked separately). */
+  readonly buildable: Uint8Array;
   readonly players: Player[] = [];
   readonly entities: Entity[] = [];
   readonly byId = new Map<number, Entity>();
   tick = 0;
   nextId = 1;
+  /** Entities to remove at the end of the current tick, resolved in id order. */
+  readonly removals: number[] = [];
   commandSeq = 0;
   readonly commands: Command[] = [];
   readonly pathJobs: PathJob[] = [];
@@ -60,6 +68,13 @@ export class World {
     this.pathfinder = new Pathfinder(this.nav);
     this.search = new LocalSearch(this.nav.size);
     this.random = new Random(seed);
+    this.buildable = new Uint8Array(this.nav.size);
+    const propBuildable = new Uint8Array(256).fill(1);
+    for (const prop of rules.terrain.props) propBuildable[prop.index] = prop.buildable ? 1 : 0;
+    for (let i = 0; i < this.nav.size; i++) {
+      const terrain = rules.terrain.terrain[map.tiles[i]];
+      this.buildable[i] = terrain && terrain.buildable && propBuildable[map.props[i]] ? 1 : 0;
+    }
   }
 
   get(id: number): Entity | undefined { return this.byId.get(id); }
@@ -78,7 +93,7 @@ export class World {
   }
 
   addPlayer(faction: string, credits: number): Player {
-    const player = { index: this.players.length, faction, credits };
+    const player = { index: this.players.length, faction, credits, ledger: { delivered: 0, oil: 0, spent: 0, refunded: 0 } };
     this.players.push(player);
     return player;
   }
@@ -98,11 +113,78 @@ export class World {
     return entity;
   }
 
+  spawnBuilding(type: string, owner: number, origin: number): Entity {
+    const def = this.rules.buildings.get(type);
+    if (!def) throw new Error(`Unknown building ${type}`);
+    const entity = createEntity(this.nextId++, 'building', type, owner, def.hp);
+    entity.tile = origin;
+    const s = this.subTile;
+    const w = this.nav.width;
+    entity.x = entity.prevX = (origin % w) * s + (def.footprint.w * s >> 1);
+    entity.y = entity.prevY = ((origin / w) | 0) * s + (def.footprint.h * s >> 1);
+    entity.facing = entity.prevFacing = 0;
+    if (typeof def.capabilities.supply === 'number') entity.stock = def.capabilities.supply;
+    if (def.dockSlots > 0) entity.docks = [];
+    this.nav.setStructure(footprintTiles(this, def, origin), entity.id);
+    this.entities.push(entity);
+    this.byId.set(entity.id, entity);
+    return entity;
+  }
+
+  /** Place a building near a tile using the shared placement rules (scenario setup). */
+  placeBuildingNear(def: BuildingDef, owner: number, x: number, y: number): Entity {
+    const origin = findPlacement(this, def, x, y);
+    if (origin < 0) throw new Error(`No valid placement for ${def.id} near ${x},${y}`);
+    return this.spawnBuilding(def.id, owner, origin);
+  }
+
+  /** Queue an entity for removal at the end of this tick (idempotent). */
+  remove(id: number): void {
+    if (this.byId.has(id) && !this.removals.includes(id)) this.removals.push(id);
+  }
+
+  private flushRemovals(): void {
+    if (this.removals.length === 0) return;
+    this.removals.sort((a, b) => a - b);
+    for (const id of this.removals) {
+      const entity = this.byId.get(id);
+      if (!entity) continue;
+      if (entity.kind === 'unit') {
+        if (entity.tile >= 0 && this.nav.occupancy[entity.tile] === id) this.nav.occupancy[entity.tile] = 0;
+        if (entity.next >= 0 && this.nav.occupancy[entity.next] === id) this.nav.occupancy[entity.next] = 0;
+        releaseDock(this, entity);
+      } else {
+        const def = this.rules.buildings.get(entity.type)!;
+        this.nav.setStructure(footprintTiles(this, def, entity.tile), 0);
+      }
+      this.byId.delete(id);
+    }
+    let write = 0;
+    for (const entity of this.entities) if (this.byId.has(entity.id)) this.entities[write++] = entity;
+    this.entities.length = write;
+    this.removals.length = 0;
+  }
+
   /** Place scenario forces on free tiles in breadth-first order around each anchor. */
   loadScenario(scenario: ScenarioDef): void {
-    const main = this.mainComponent();
+    const preset = this.rules.maps.get(scenario.map)!;
+    if (scenario.resources) {
+      const dump = this.rules.buildings.get(preset.supplyType)!;
+      const derrick = this.rules.buildings.get(preset.derrickType)!;
+      for (const p of preset.supplies) this.placeBuildingNear(dump, -1, p.x, p.y);
+      for (const p of preset.derricks) this.placeBuildingNear(derrick, -1, p.x, p.y);
+    }
     for (const setup of scenario.players) {
       const player = this.addPlayer(setup.faction, setup.credits);
+      for (const building of setup.buildings) {
+        const spawn = preset.spawns[building.spawn];
+        this.placeBuildingNear(this.rules.buildings.get(building.type)!, player.index, spawn.x, spawn.y);
+      }
+    }
+    const main = this.mainComponent();
+    for (let index = 0; index < scenario.players.length; index++) {
+      const setup = scenario.players[index];
+      const player = this.players[index];
       const anchor = this.nav.nearestInComponent(this.nav.index(setup.anchor.x, setup.anchor.y), main);
       if (anchor < 0) throw new Error(`Scenario ${scenario.id}: anchor is not near reachable ground`);
       let total = 0;
@@ -111,7 +193,11 @@ export class World {
       if (tiles.length < total) throw new Error(`Scenario ${scenario.id}: not enough room for ${total} units`);
       let cursor = 0;
       for (const group of setup.units) {
-        for (let i = 0; i < group.count; i++) this.spawnUnit(group.type, player.index, tiles[cursor++]);
+        for (let i = 0; i < group.count; i++) {
+          const unit = this.spawnUnit(group.type, player.index, tiles[cursor++]);
+          // Scenario trucks start hauling, as freshly produced trucks will.
+          if (this.rules.units.get(group.type)!.capabilities.cargo) { unit.auto = true; unit.task = 'seek-dump'; }
+        }
       }
     }
   }
@@ -155,6 +241,8 @@ export class World {
       const def = this.rules.units.get(entity.type)!;
       if (def.movement === 'ground') updateGroundUnit(this, entity, def);
     }
+    updateEconomy(this);
+    this.flushRemovals();
   }
 
   private executeCommands(): void {
@@ -183,16 +271,61 @@ export class World {
 
   private execute(command: Command): void {
     const units = this.ownedUnits(command);
-    if (command.kind === 'stop') {
-      for (const unit of units) this.stopUnit(unit);
-      return;
-    }
-    if (command.kind === 'move') {
-      if (!this.nav.inBounds(command.x, command.y)) return;
-      const ground = units.filter(unit => this.rules.units.get(unit.type)!.movement === 'ground');
-      this.orderMove(ground, this.nav.index(command.x, command.y));
+    const target = command.target !== undefined ? this.byId.get(command.target) : undefined;
+    switch (command.kind) {
+      case 'stop':
+        for (const unit of units) { cancelTask(this, unit); this.stopUnit(unit); }
+        return;
+      case 'move': {
+        if (!this.nav.inBounds(command.x, command.y)) return;
+        const ground = units.filter(unit => this.rules.units.get(unit.type)!.movement === 'ground');
+        // A manual move suspends autonomous hauling/capture until explicitly resumed.
+        for (const unit of ground) cancelTask(this, unit);
+        this.orderMove(ground, this.nav.index(command.x, command.y));
+        return;
+      }
+      case 'harvest':
+      case 'deposit': {
+        const depot = command.kind === 'deposit';
+        if (target && target.kind !== 'building') return;
+        for (const unit of units) {
+          const cargo = this.rules.units.get(unit.type)!.capabilities.cargo;
+          if (typeof cargo !== 'number') continue;
+          cancelTask(this, unit);
+          unit.auto = true;
+          unit.preferred = target ? target.id : -1;
+          unit.task = depot || unit.cargo >= cargo ? 'seek-depot' : 'seek-dump';
+          unit.timer = 0;
+        }
+        return;
+      }
+      case 'capture': {
+        const def = target && target.kind === 'building' ? this.rules.buildings.get(target.type) : undefined;
+        if (!target || !def?.capabilities.capturable) return;
+        for (const unit of units) {
+          if (!this.rules.units.get(unit.type)!.capabilities.capture || target.owner === unit.owner) continue;
+          cancelTask(this, unit);
+          unit.task = 'capture';
+          unit.target = target.id;
+          unit.timer = 0;
+        }
+        return;
+      }
     }
   }
+
+  /** Internal single-unit move to an exact tile (task systems); keeps task state. */
+  moveUnitTo(unit: Entity, tile: number): void {
+    this.stopUnit(unit);
+    unit.goal = tile;
+    unit.moveState = MoveState.Pending;
+    unit.lastProgress = this.tick;
+    unit.repath = 1;
+    this.pathJobs.push({ entity: unit.id, orderId: unit.orderId, dynamic: false, fieldTarget: -1 });
+  }
+
+  /** Distance field from a tile at the current grid revision (memoised; pure). */
+  fieldFrom(tile: number): Int32Array { return this.field(tile); }
 
   stopUnit(unit: Entity): void {
     unit.orderId++;

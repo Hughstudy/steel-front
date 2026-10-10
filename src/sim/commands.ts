@@ -2,7 +2,7 @@
  * Tick-stamped, serializable player commands. UI and AI only enqueue these;
  * the world validates ownership/targets when the command executes.
  */
-export type CommandKind = 'move' | 'stop';
+export type CommandKind = 'move' | 'stop' | 'harvest' | 'deposit' | 'capture';
 
 export interface CommandInput {
   player: number;
@@ -11,6 +11,8 @@ export interface CommandInput {
   /** Target tile coordinates (integers), when applicable. */
   x: number;
   y: number;
+  /** Target entity id for harvest/deposit/capture (-1 or omitted when not applicable). */
+  target?: number;
 }
 
 export interface Command extends CommandInput {
