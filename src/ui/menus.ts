@@ -147,7 +147,7 @@ export class Menus {
   private readonly host: MenuHost;
   private readonly dialogs: Record<'main' | 'setup' | 'pause' | 'slots' | 'settings' | 'results' | 'guide', HTMLDialogElement>;
   private slotMode: 'save' | 'load' = 'load';
-  private setup: { faction: string; map: string; difficulty: string; mode: 'play' | 'spectate' };
+  private setup: { faction: string; map: string; difficulty: string; mode: 'play' | 'spectate'; infiniteSupplies: boolean };
 
   constructor(host: MenuHost) {
     this.host = host;
@@ -160,7 +160,7 @@ export class Menus {
     this.stack.sticky.add(this.dialogs.main);
     this.stack.sticky.add(this.dialogs.results);
     this.stack.onEmpty = () => host.resume();
-    this.setup = { faction: rules.skirmish.defaultFaction, map: rules.skirmish.defaultMap, difficulty: rules.ai.defaultDifficulty, mode: 'play' };
+    this.setup = { faction: rules.skirmish.defaultFaction, map: rules.skirmish.defaultMap, difficulty: rules.ai.defaultDifficulty, mode: 'play', infiniteSupplies: true };
     for (const dialog of Object.values(this.dialogs)) dialog.addEventListener('click', event => { if ((event.target as HTMLElement).closest('button')) host.click(); });
 
     // Main menu.
@@ -190,9 +190,12 @@ export class Menus {
     const difficulties = element('setup-difficulties');
     const notes: Record<string, string> = { easy: 'Slow, small attacks', normal: 'Steady pressure', hard: 'Fast build, large waves' };
     for (const level of rules.ai.difficulties.values()) difficulties.append(this.choice('difficulty', level.id, level.name, notes[level.id] ?? ''));
+    element<HTMLInputElement>('setup-infinite-supplies').checked = this.setup.infiniteSupplies;
     this.dialogs.setup.addEventListener('change', event => {
       const input = event.target as HTMLInputElement;
-      if (input.name in this.setup) (this.setup as Record<string, string>)[input.name] = input.value;
+      if (input.name === 'infiniteSupplies') this.setup.infiniteSupplies = input.checked;
+      else if (input.name === 'mode' && (input.value === 'play' || input.value === 'spectate')) this.setup.mode = input.value;
+      else if (input.name === 'faction' || input.name === 'map' || input.name === 'difficulty') this.setup[input.name] = input.value;
       this.describeSetup();
     });
     this.describeSetup();
@@ -221,14 +224,14 @@ export class Menus {
     element('results-again').addEventListener('click', () => host.playAgain());
   }
 
-  private choice(name: string, value: string, title: string, note: string, swatch = ''): HTMLLabelElement {
+  private choice(name: 'faction' | 'map' | 'difficulty' | 'mode', value: string, title: string, note: string, swatch = ''): HTMLLabelElement {
     const label = document.createElement('label');
     label.className = 'choice';
     const input = document.createElement('input');
     input.type = 'radio';
     input.name = name;
     input.value = value;
-    input.checked = (this.setup as Record<string, string>)[name] === value;
+    input.checked = this.setup[name] === value;
     label.append(input);
     if (swatch) { const bar = document.createElement('span'); bar.className = 'swatch'; bar.style.background = swatch; label.append(bar); }
     const b = document.createElement('b');
@@ -247,7 +250,8 @@ export class Menus {
     element('setup-difficulty-label').textContent = spectating ? 'DIFFICULTY FOR BOTH AIs' : 'COMPUTER OPPONENT';
     element('setup-start-label').textContent = spectating ? 'WATCH BATTLE' : 'START BATTLE';
     element('setup-summary').textContent = `${rules.factions.get(this.setup.faction)!.name} vs ${enemy.name} (${rules.ai.difficulties.get(this.setup.difficulty)!.name}) on ${rules.maps.get(this.setup.map)!.name}. `
-      + `Both sides start with one MCV, ${rules.skirmish.credits} credits and an infinite supply depot nearby. `
+      + `Both sides start with one MCV and ${rules.skirmish.credits} credits. `
+      + (this.setup.infiniteSupplies ? 'Each base has a nearby infinite supply yard. ' : 'Infinite yards are off; trucks collect from finite supply dumps. ')
       + (spectating ? 'Both sides are AI-controlled. Explore the revealed battlefield while they fight for victory.' : 'Destroy the enemy MCV or headquarters to win.');
   }
 

@@ -3,7 +3,7 @@ import type { MapPreset, Rules, ScenarioDef } from './rules.ts';
 
 /** What a match was started from; saved with the match so the map can be regenerated. */
 export type MatchSetup =
-  | { kind: 'skirmish'; map: string; faction: string; difficulty: string; mode?: 'play' | 'spectate' }
+  | { kind: 'skirmish'; map: string; faction: string; difficulty: string; mode?: 'play' | 'spectate'; infiniteSupplies?: boolean }
   | { kind: 'scenario'; id: string; difficulty: string };
 
 /** Older setups without a mode remain ordinary player-versus-AI matches. */
@@ -30,8 +30,8 @@ export function opponentOf(rules: Rules, faction: string): string {
   return faction;
 }
 
-/** Spawn 0 is the chosen faction; spectators let both sides use the normal planner. */
-export function skirmishScenario(rules: Rules, map: string, faction: string, difficulty: string, mode: 'play' | 'spectate' = 'play'): ScenarioDef {
+/** Spawn 0 is the chosen faction; omitted supply options preserve existing saves' yards. */
+export function skirmishScenario(rules: Rules, map: string, faction: string, difficulty: string, mode: 'play' | 'spectate' = 'play', infiniteSupplies = true): ScenarioDef {
   const preset = rules.maps.get(map);
   if (!preset || !rules.skirmish.maps.includes(map)) throw new Error(`Unknown skirmish map ${map}`);
   if (!rules.skirmish.start.has(faction)) throw new Error(`Unknown faction ${faction}`);
@@ -48,7 +48,7 @@ export function skirmishScenario(rules: Rules, map: string, faction: string, dif
     map,
     camera: { x: home.x, y: home.y },
     resources: true,
-    infiniteSupplies: true,
+    infiniteSupplies,
     fog: true,
     victory: true,
     players: [
@@ -60,7 +60,7 @@ export function skirmishScenario(rules: Rules, map: string, faction: string, dif
 
 /** Scenario and map preset for a setup (development scenarios keep their own map). */
 export function scenarioFor(rules: Rules, setup: MatchSetup): ScenarioDef {
-  if (setup.kind === 'skirmish') return skirmishScenario(rules, setup.map, setup.faction, setup.difficulty, setup.mode);
+  if (setup.kind === 'skirmish') return skirmishScenario(rules, setup.map, setup.faction, setup.difficulty, setup.mode, setup.infiniteSupplies);
   const scenario = rules.scenarios.get(setup.id);
   if (!scenario) throw new Error(`Unknown scenario ${setup.id}`);
   return scenario;

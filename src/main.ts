@@ -172,7 +172,7 @@ function matchLabel(): string {
   if (!setup) return '';
   const scenario = scenarioFor(rules, setup);
   const faction = rules.factions.get(world.players[PLAYER]?.faction ?? '')?.name ?? '';
-  return setup.kind === 'skirmish' ? `${spectating() ? 'AI vs AI · ' : ''}${faction} · ${rules.maps.get(setup.map)!.name} · ${rules.ai.difficulties.get(setup.difficulty)!.name}` : `${scenario.name} (development)`;
+  return setup.kind === 'skirmish' ? `${spectating() ? 'AI vs AI · ' : ''}${faction} · ${rules.maps.get(setup.map)!.name} · ${rules.ai.difficulties.get(setup.difficulty)!.name} · Infinite yards ${setup.infiniteSupplies === false ? 'off' : 'on'}` : `${scenario.name} (development)`;
 }
 
 function saveMatch(slot: number): string | null {

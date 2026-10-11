@@ -1,5 +1,15 @@
 # Steel Front status
 
+## Done — M8: Optional infinite supply yards
+Completed 2026-10-11. New Skirmish includes **Infinite supplies near bases**, enabled by default. Uncheck it to omit the two extra yards while retaining all finite dumps and oil derricks. The option works in Play and Watch modes on both maps, appears in the setup/pause/save labels, and survives save/load and Play Again/Watch Again.
+
+- M7 saves remain compatible: an omitted option defaults to enabled. No game-data, rules-hash, save-version or dependency changes.
+- `npm test`: **108/108 pass**. `npm run build` and `git diff --check`: pass. Four new regressions cover resource counts, saved settings, exact continuation, restart, legacy saves and invalid values.
+- Dev browser, real input: all eight mode/map/on-off combinations, both resource choices through save/load and Again buttons, keyboard checkbox operation and setup layouts at 550/630/1280 px. No console warnings/errors. Independent integration review found no actionable issues.
+- **Delivery:** tested source/build prepared for publication. Evidence: `docs/verification/M8.md`.
+- **Next:** publish and verify this update, then user playtesting. No other gameplay work is planned.
+- **Known issues:** existing pre-M7 save incompatibility, audio-by-ear and sustained target-laptop performance limitations remain unchanged.
+
 ## Done — M7: AI observer and renewable supplies
 Completed 2026-10-11. New Skirmish now offers **Play vs AI** and **Watch AI vs AI**. Watch mode runs two computer commanders at the selected difficulty, exposes the full battlefield to the observer, and provides base-focus buttons and both armies' funds/power. Each AI still follows its own fog of war. Inspection, camera controls, pause, save/load and Watch Again work; the observer cannot issue army or production commands. Results name the winning faction.
 

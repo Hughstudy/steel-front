@@ -238,9 +238,10 @@ function checkSetup(value: unknown, rules: Rules): MatchSetup {
   const setup = value as Record<string, unknown>;
   if (!setup || typeof setup !== 'object') throw new SaveError('setup: expected an object');
   if (setup.kind === 'skirmish') {
-    const { mode, ...rest } = setup;
+    const { mode, infiniteSupplies, ...rest } = setup;
     check(rest, { kind: S, map: S, faction: S, difficulty: S }, 'setup');
     if (mode !== undefined && mode !== 'play' && mode !== 'spectate') throw new SaveError('setup.mode: unknown skirmish mode');
+    if (infiniteSupplies !== undefined) check(infiniteSupplies, B, 'setup.infiniteSupplies');
   }
   else if (setup.kind === 'scenario') check(setup, { kind: S, id: S, difficulty: S }, 'setup');
   else throw new SaveError('setup.kind: unknown match type');

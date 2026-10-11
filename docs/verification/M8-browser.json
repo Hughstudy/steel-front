@@ -1,0 +1,116 @@
+{
+  "url": "http://127.0.0.1:5175/",
+  "matches": [
+    {
+      "setup": {
+        "kind": "skirmish",
+        "faction": "allies",
+        "map": "lowlands",
+        "difficulty": "normal",
+        "mode": "play",
+        "infiniteSupplies": false
+      },
+      "yards": 0,
+      "dumps": 10,
+      "oil": 4
+    },
+    {
+      "setup": {
+        "kind": "skirmish",
+        "faction": "allies",
+        "map": "lowlands",
+        "difficulty": "normal",
+        "mode": "play",
+        "infiniteSupplies": true
+      },
+      "yards": 2,
+      "dumps": 10,
+      "oil": 4
+    },
+    {
+      "setup": {
+        "kind": "skirmish",
+        "faction": "allies",
+        "map": "ardennes",
+        "difficulty": "normal",
+        "mode": "play",
+        "infiniteSupplies": false
+      },
+      "yards": 0,
+      "dumps": 10,
+      "oil": 4
+    },
+    {
+      "setup": {
+        "kind": "skirmish",
+        "faction": "allies",
+        "map": "ardennes",
+        "difficulty": "normal",
+        "mode": "play",
+        "infiniteSupplies": true
+      },
+      "yards": 2,
+      "dumps": 10,
+      "oil": 4
+    },
+    {
+      "setup": {
+        "kind": "skirmish",
+        "faction": "allies",
+        "map": "lowlands",
+        "difficulty": "normal",
+        "mode": "spectate",
+        "infiniteSupplies": false
+      },
+      "yards": 0,
+      "dumps": 10,
+      "oil": 4
+    },
+    {
+      "setup": {
+        "kind": "skirmish",
+        "faction": "allies",
+        "map": "lowlands",
+        "difficulty": "normal",
+        "mode": "spectate",
+        "infiniteSupplies": true
+      },
+      "yards": 2,
+      "dumps": 10,
+      "oil": 4
+    },
+    {
+      "setup": {
+        "kind": "skirmish",
+        "faction": "allies",
+        "map": "ardennes",
+        "difficulty": "normal",
+        "mode": "spectate",
+        "infiniteSupplies": false
+      },
+      "yards": 0,
+      "dumps": 10,
+      "oil": 4
+    },
+    {
+      "setup": {
+        "kind": "skirmish",
+        "faction": "allies",
+        "map": "ardennes",
+        "difficulty": "normal",
+        "mode": "spectate",
+        "infiniteSupplies": true
+      },
+      "yards": 2,
+      "dumps": 10,
+      "oil": 4
+    }
+  ],
+  "errors": [],
+  "saveLoadAndAgain": "both options in Play and Watch",
+  "layouts": [
+    550,
+    630,
+    1280
+  ]
+}
