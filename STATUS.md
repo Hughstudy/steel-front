@@ -8,8 +8,8 @@ Completed 2026-10-11. New Skirmish now offers **Play vs AI** and **Watch AI vs A
 - `npm test`: **104/104 pass**. `npm run build` and `git diff --check`: pass. No dependency changes.
 - Real browser input on the dev server and production preview under `/steel-front/`: setup, both base buttons, inspection, pointer/hotkey command lockout, supply-yard ∞ details, save/load, Watch Again and return to normal Axis/Ardennes play. An accelerated autonomous Regular/Lowlands match ended in **Allies victory at 41:55 (tick 50304)**; both sides built bases, hauled and attacked. Final browser checks had no console warnings/errors. Layout checks pass at 550, 630 and 1280 px.
 - Independent integration review found a neutral-structure observer-hover issue; it was reproduced, fixed and covered by a regression. Final review found no other actionable defects.
-- **Delivery:** local source and production build prepared; GitHub Pages has not been republished in this session. Evidence: `docs/verification/M7.md`.
-- **Next:** publish the tested build when requested, then user playtesting. No additional gameplay milestone is planned.
+- **Published:** https://hughstudy.github.io/steel-front/ — source `c76e243` is on `main`; deployment `e789a3e` is on `gh-pages`. GitHub Pages reports `built`. Public HTML, JS and CSS match the release files byte for byte. Live browser checks passed for both observer maps, infinite yards, save/load and normal MCV deployment, with no console warnings/errors. Evidence: `docs/verification/M7.md` and `docs/verification/M7-live.json`.
+- **Next:** user playtesting. No additional gameplay milestone is planned.
 - **Known issues:** older saves are rejected by the existing rules-hash policy because building/map data changed. New saves resume deterministically. Audio by ear and sustained target-laptop frame pacing remain unverified; the AI completion check advances simulation ticks rather than waiting 42 minutes in real time.
 
 ## Done — aircraft review fixes and release verification

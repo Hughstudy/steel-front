@@ -1,0 +1,89 @@
+{
+  "url": "https://hughstudy.github.io/steel-front/",
+  "source": "c76e243",
+  "files": [
+    {
+      "path": "index.html",
+      "sha256": "647b0b4f1bb9b22637ab22c55da20abe67daf4cdb361f10699480708d699b0ac"
+    },
+    {
+      "path": "assets/index-BHD6fjjp.js",
+      "sha256": "0b6e94f616fd903d89107538b77cc8808c0e35be33d0c064203c3abdac3d9b5d"
+    },
+    {
+      "path": "assets/index-Cb-ciTRH.css",
+      "sha256": "1ae02cc65c2051f689482369b44172378b6836fcc34ccdc8260bb537d1cb6eff"
+    }
+  ],
+  "matches": [
+    {
+      "setup": {
+        "kind": "skirmish",
+        "faction": "allies",
+        "map": "lowlands",
+        "difficulty": "normal",
+        "mode": "spectate"
+      },
+      "fog": true,
+      "viewFog": false,
+      "players": [
+        {
+          "ai": "normal",
+          "deployed": true,
+          "income": 2400
+        },
+        {
+          "ai": "normal",
+          "deployed": true,
+          "income": 3000
+        }
+      ],
+      "yards": [
+        {
+          "id": 15,
+          "stock": 3000
+        },
+        {
+          "id": 16,
+          "stock": 3000
+        }
+      ]
+    },
+    {
+      "setup": {
+        "kind": "skirmish",
+        "faction": "allies",
+        "map": "ardennes",
+        "difficulty": "normal",
+        "mode": "spectate"
+      },
+      "fog": true,
+      "viewFog": false,
+      "players": [
+        {
+          "ai": "normal",
+          "deployed": true,
+          "income": 1800
+        },
+        {
+          "ai": "normal",
+          "deployed": true,
+          "income": 1400
+        }
+      ],
+      "yards": [
+        {
+          "id": 15,
+          "stock": 3000
+        },
+        {
+          "id": 16,
+          "stock": 3000
+        }
+      ]
+    }
+  ],
+  "console": [],
+  "saveLoad": "passed",
+  "normalPlay": "MCV selected and deployed via real clicks"
+}
