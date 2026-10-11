@@ -132,9 +132,10 @@ function load(world: World, truck: Entity, capacity: number): void {
   if (!target || target.stock <= 0 || truck.cargo >= capacity) { finishLoad(world, truck); return; }
   const lease = leaseOf(world, truck);
   if (!lease || !touches(world, target, truck.tile) || truck.next >= 0) { truck.task = 'to-dump'; if (!lease) finishLoad(world, truck); return; }
-  // Stock leaves the dump only as it enters the truck: value is conserved exactly.
+  // Finite stock leaves only as it enters the truck. Endless sites keep bounded,
+  // JSON-safe stock while still using the normal loading rate and cargo limit.
   const amount = Math.min(world.rules.economy.loadPerTick, target.stock, capacity - truck.cargo);
-  target.stock -= amount;
+  if (!world.rules.buildings.get(target.type)!.capabilities.infiniteSupply) target.stock -= amount;
   truck.cargo += amount;
   renewDock(world, truck);
   if (target.stock <= 0) world.remove(target.id);

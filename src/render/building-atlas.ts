@@ -82,6 +82,16 @@ const painters: Record<string, Painter> = {
     // Camouflage net over the stack.
     flat(c, -0.2, -0.2, 0, 26, [[-0.45, -0.45], [0.35, -0.45], [0.35, 0.35], [-0.45, 0.35]], 'rgba(79,96,62,.55)');
   },
+  supply_source(c, w, h, faction, params) {
+    painters.dump(c, w, h, faction, params);
+    // A standing infinity sign distinguishes replenishing yards from finite stacks.
+    const [x, y] = project(0.65, -0.65, 0);
+    c.fillStyle = '#494c40'; c.fillRect(x - 1, y - 35, 2, 35);
+    c.fillStyle = '#2b403b'; c.fillRect(x - 13, y - 40, 26, 18);
+    c.strokeStyle = '#d4d9ad'; c.lineWidth = 1; c.strokeRect(x - 13, y - 40, 26, 18);
+    c.fillStyle = '#f1efce'; c.font = 'bold 22px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText('∞', x, y - 31);
+  },
   derrick(c, w, h, faction) {
     flat(c, 0, 0, 0, 0.5, [[-w / 2 + 0.1, -h / 2 + 0.1], [w / 2 - 0.1, -h / 2 + 0.1], [w / 2 - 0.1, h / 2 - 0.1], [-w / 2 + 0.1, h / 2 - 0.1]], '#4d4a3d');
     // Storage tanks.

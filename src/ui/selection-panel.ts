@@ -57,7 +57,7 @@ export function describe(world: World, entity: Entity): string {
     if (def.power !== 0 && entity.owner >= 0) parts.push(`POWER ${def.power > 0 ? '+' : ''}${def.power}`);
     if (entity.repairing) parts.push('REPAIRING');
     if (entity.rally >= 0) parts.push('RALLY SET');
-    if (typeof def.capabilities.supply === 'number') parts.push(`${entity.stock} / ${def.capabilities.supply} supplies`);
+    if (typeof def.capabilities.supply === 'number') parts.push(def.capabilities.infiniteSupply ? '∞ INFINITE SUPPLIES' : `${entity.stock} / ${def.capabilities.supply} supplies`);
     if (def.capabilities.oil) parts.push(entity.owner < 0 ? 'engineer can capture' : `+${world.rules.economy.oilPayout} every ${world.rules.economy.oilIntervalTicks / world.rules.game.ticksPerSecond}s`);
     if (def.dockSlots > 0) parts.push(`docks ${entity.docks?.length ?? 0}/${def.dockSlots}`);
     return parts.join(' · ');

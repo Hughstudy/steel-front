@@ -15,3 +15,5 @@ Combat effects (muzzle flashes, tracers, shells, explosions, smoke), the fog-of-
 Combat balance *ratios* are inspired by Spring: 1944 (<https://github.com/spring1944/spring1944>, by the Spring: 1944 development team; data CC BY-NC 3.0, code GPL). No Spring: 1944 code, data tables, art or audio is included. See BALANCE.md.
 
 All sound effects are synthesized at runtime with the WebAudio API (oscillators and filtered, seeded noise) in `src/audio/sfx.ts`; no recorded or third-party audio is used. The winter palette of The Ardennes is an original colour set in `data/maps.json`.
+
+The infinite-yard signs and inline favicon are original Canvas 2D/SVG drawing code. `docs/m7-observer.png` and `docs/m7-results.png` show this project's own M7 production build.

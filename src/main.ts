@@ -36,7 +36,7 @@ import { contextOrder } from './ui/orders.ts';
 import { clock, loadPreferences, Menus, readSlot, savePreferences, writeSlot } from './ui/menus.ts';
 import { Sfx } from './audio/sfx.ts';
 import type { Cue } from './audio/sfx.ts';
-import { mapConfigFor, scenarioFor } from './sim/skirmish.ts';
+import { isSpectator, mapConfigFor, scenarioFor } from './sim/skirmish.ts';
 import type { MatchSetup } from './sim/skirmish.ts';
 import { loadMatch, MAX_SAVE_CHARS, SaveError, serializeMatch } from './sim/save.ts';
 import { ProductionPanel } from './ui/production-panel.ts';
@@ -82,6 +82,12 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const PLAYER = 0;
 /** The running match's setup; null while no match exists (menu backdrop). */
 let setup: MatchSetup | null = null;
+const spectating = (): boolean => isSpectator(setup);
+const viewer = (): number => spectating() ? -1 : PLAYER;
+/** All human command entry points share the observer guard. AI commands stay in the simulation. */
+function issueCommand(command: Parameters<World['enqueue']>[0]): void {
+  if (setup && !spectating() && !world.outcome) world.enqueue(command);
+}
 let world = backdropWorld();
 let home = { x: config.spawn.x, y: config.spawn.y };
 /** Entity shown in the panel when nothing is selected (live entity id or a memory ghost). */
@@ -136,9 +142,14 @@ function install(next: World, nextSetup: MatchSetup | null, focus: { x: number; 
   camera.reset(focus.x, focus.y);
   document.getElementById('mission-title')!.firstChild!.textContent = title.toUpperCase();
   document.getElementById('mission-text')!.textContent = text;
-  document.getElementById('mode-label')!.textContent = !nextSetup ? 'MAIN MENU' : nextSetup.kind === 'skirmish' ? 'SKIRMISH' : 'DEVELOPMENT SCENARIO';
+  document.getElementById('mode-label')!.textContent = !nextSetup ? 'MAIN MENU' : spectating() ? 'AI VS AI' : nextSetup.kind === 'skirmish' ? 'SKIRMISH' : 'DEVELOPMENT SCENARIO';
   document.getElementById('bottom-mode')!.textContent = !nextSetup ? 'MAIN MENU' : nextSetup.kind === 'skirmish'
-    ? `SKIRMISH · ${rules.ai.difficulties.get(nextSetup.difficulty)!.name.toUpperCase()} COMPUTER OPPONENT` : 'DEVELOPMENT SCENARIO · NO VICTORY CONDITION';
+    ? `${spectating() ? 'OBSERVER · TWO' : 'SKIRMISH ·'} ${rules.ai.difficulties.get(nextSetup.difficulty)!.name.toUpperCase()} ${spectating() ? 'AIs' : 'COMPUTER OPPONENT'}` : 'DEVELOPMENT SCENARIO · NO VICTORY CONDITION';
+  document.getElementById('production-panel')!.hidden = spectating();
+  document.getElementById('spectator-panel')!.hidden = !spectating();
+  document.getElementById('selection-actions')!.hidden = spectating();
+  document.getElementById('app')!.classList.toggle('spectating', spectating());
+  updateHud();
   lastPanel = 0;
 }
 
@@ -161,7 +172,7 @@ function matchLabel(): string {
   if (!setup) return '';
   const scenario = scenarioFor(rules, setup);
   const faction = rules.factions.get(world.players[PLAYER]?.faction ?? '')?.name ?? '';
-  return setup.kind === 'skirmish' ? `${faction} · ${rules.maps.get(setup.map)!.name} · ${rules.ai.difficulties.get(setup.difficulty)!.name}` : `${scenario.name} (development)`;
+  return setup.kind === 'skirmish' ? `${spectating() ? 'AI vs AI · ' : ''}${faction} · ${rules.maps.get(setup.map)!.name} · ${rules.ai.difficulties.get(setup.difficulty)!.name}` : `${scenario.name} (development)`;
 }
 
 function saveMatch(slot: number): string | null {
@@ -208,13 +219,13 @@ const cameraInput = new CameraInput(canvas, camera, (x, y) => hud.inspect(x, y),
 
 /** Whether the local player sees a tile now (effects and projectiles are filtered by it). */
 function tileVisible(tx: number, ty: number): boolean {
-  if (!world.fogEnabled) return true;
+  if (spectating() || !world.fogEnabled) return true;
   const x = Math.floor(tx);
   const y = Math.floor(ty);
   if (!world.nav.inBounds(x, y)) return false;
   return world.players[PLAYER].fog.visible[world.nav.index(x, y)] === 1;
 }
-const seen = (entity: Entity): boolean => canSee(world, PLAYER, entity);
+const seen = (entity: Entity): boolean => spectating() || canSee(world, PLAYER, entity);
 
 /**
  * Remembered enemy/neutral structures under fog, drawn as last seen. Ghosts use
@@ -224,7 +235,7 @@ const ghosts = new Map<number, Entity>();
 const ghostList: Entity[] = [];
 function refreshGhosts(): void {
   ghostList.length = 0;
-  if (!world.fogEnabled) return;
+  if (spectating() || !world.fogEnabled) return;
   const memory = world.players[PLAYER].fog.memory;
   for (const [id, ghost] of ghosts) if (!memory.has(-ghost.id - 1) || ghost.type !== memory.get(-ghost.id - 1)!.type) ghosts.delete(id);
   for (const record of memory.values()) {
@@ -243,10 +254,11 @@ function refreshGhosts(): void {
 
 function stopSelected(): void {
   const ids = selection.list();
-  if (ids.length) world.enqueue({ player: PLAYER, kind: 'stop', ids, x: 0, y: 0 });
+  if (ids.length) issueCommand({ player: PLAYER, kind: 'stop', ids, x: 0, y: 0 });
 }
 
 function setMode(mode: HudMode, type = ''): void {
+  if (spectating() && mode !== '') return;
   placement.start(mode, type);
   document.getElementById('mode-sell')!.setAttribute('aria-pressed', String(mode === 'sell'));
   document.getElementById('mode-repair')!.setAttribute('aria-pressed', String(mode === 'repair'));
@@ -258,15 +270,16 @@ function selectedUnits(): number[] { return selection.list().filter(id => world.
 
 function deploySelected(): void {
   const ids = selectedUnits().filter(id => typeof rules.units.get(world.get(id)!.type)?.capabilities.deploy === 'string');
-  if (ids.length) world.enqueue({ player: PLAYER, kind: 'deploy', ids, x: 0, y: 0 });
+  if (ids.length) issueCommand({ player: PLAYER, kind: 'deploy', ids, x: 0, y: 0 });
 }
 
 const gameInput = new GameInput(canvas, camera, layer, selection, {
-  player: () => PLAYER,
+  player: viewer,
   world: () => world,
-  selectable: (entity: Entity) => entity.owner === PLAYER,
+  selectable: (entity: Entity) => !spectating() && entity.owner === PLAYER,
   inspect: entity => { inspected = entity && (entity.id < 0 || seen(entity)) ? entity : null; },
   primaryAction: (tileX, tileY) => {
+    if (spectating()) return false;
     if (placement.mode === 'place') {
       const def = rules.buildings.get(placement.type)!;
       const origin = placement.originAt(world, def, tileX, tileY);
@@ -278,7 +291,7 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
         notice(`Cannot place: ${problemText(placement.problem)}`);
         return true;
       }
-      world.enqueue({ player: PLAYER, kind: 'place', ids: [], x: origin % world.nav.width, y: (origin / world.nav.width) | 0, type: placement.type });
+      issueCommand({ player: PLAYER, kind: 'place', ids: [], x: origin % world.nav.width, y: (origin / world.nav.width) | 0, type: placement.type });
       sfx.play('place');
       setMode('');
       return true;
@@ -286,7 +299,7 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
     if (placement.mode === 'amove') {
       const ids = selectedUnits();
       if (ids.length) {
-        world.enqueue({ player: PLAYER, kind: 'amove', ids, x: Math.floor(tileX), y: Math.floor(tileY) });
+        issueCommand({ player: PLAYER, kind: 'amove', ids, x: Math.floor(tileX), y: Math.floor(tileY) });
         markers.add(tileX, tileY, 'attack', presentationTime);
         sfx.play('attack');
       }
@@ -296,7 +309,7 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
     if (placement.mode === 'sell' || placement.mode === 'repair') {
       const target = gameInput.hovered();
       if (target && target.kind === 'building' && target.owner === PLAYER) {
-        world.enqueue({ player: PLAYER, kind: placement.mode, ids: [], x: 0, y: 0, target: target.id });
+        issueCommand({ player: PLAYER, kind: placement.mode, ids: [], x: 0, y: 0, target: target.id });
         markers.add(target.x / world.subTile, target.y / world.subTile, placement.mode === 'sell' ? 'invalid' : 'rally', presentationTime);
       }
       return true;
@@ -305,6 +318,7 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
   },
   cancelAction: () => { const active = placement.mode !== ''; setMode(''); return active; },
   order: (tileX, tileY, target, _queue, attackMove) => {
+    if (spectating()) return;
     const all = selection.list();
     const ids = selectedUnits();
     const x = Math.floor(tileX);
@@ -316,7 +330,7 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
         const def = rules.buildings.get(world.get(id)?.type ?? '');
         return def && def.produces.some(category => !rules.production.categories.find(c => c.id === category)?.placement);
       });
-      for (const id of producers) world.enqueue({ player: PLAYER, kind: 'rally', ids: [], x, y, target: id });
+      for (const id of producers) issueCommand({ player: PLAYER, kind: 'rally', ids: [], x, y, target: id });
       if (producers.length) markers.add(tileX, tileY, 'rally', presentationTime);
       return;
     }
@@ -326,7 +340,7 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
       return;
     }
     if (attackMove && world.nav.inBounds(x, y)) {
-      world.enqueue({ player: PLAYER, kind: 'amove', ids, x, y });
+      issueCommand({ player: PLAYER, kind: 'amove', ids, x, y });
       markers.add(tileX, tileY, 'attack', presentationTime);
       sfx.play('attack');
       return;
@@ -334,7 +348,7 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
     // Unseen or remembered targets take a plain move order (no hidden information).
     const context = contextOrder(world, PLAYER, ids, target && target.id > 0 && seen(target) ? target : null);
     if (context !== 'move' && target) {
-      world.enqueue({ player: PLAYER, kind: context, ids, x, y, target: target.id });
+      issueCommand({ player: PLAYER, kind: context, ids, x, y, target: target.id });
       markers.add(target.x / world.subTile, target.y / world.subTile, context === 'capture' || context === 'attack' ? 'attack' : 'rally', presentationTime);
       sfx.play(context === 'attack' ? 'attack' : 'order');
       return;
@@ -352,7 +366,7 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
       kind = resolved < 0 ? 'invalid' : resolved === tile ? 'move' : 'nearest';
       const flying = ids.some(id => { const e = world.get(id); return e !== undefined && rules.units.get(e.type)?.movement === 'air'; });
       if (resolved >= 0 || flying) {
-        world.enqueue({ player: PLAYER, kind: 'move', ids, x, y });
+        issueCommand({ player: PLAYER, kind: 'move', ids, x, y });
         const at = resolved >= 0 ? resolved : tile;
         markers.add((at % nav.width) + 0.5, ((at / nav.width) | 0) + 0.5, resolved >= 0 ? kind : 'move', presentationTime);
         sfx.play('order');
@@ -376,7 +390,7 @@ const gameInput = new GameInput(canvas, camera, layer, selection, {
 
 document.getElementById('action-haul')!.addEventListener('click', () => {
   const ids = selectedUnits();
-  if (ids.length) world.enqueue({ player: PLAYER, kind: 'harvest', ids, x: 0, y: 0 });
+  if (ids.length) issueCommand({ player: PLAYER, kind: 'harvest', ids, x: 0, y: 0 });
 });
 document.getElementById('action-stop')!.addEventListener('click', stopSelected);
 document.getElementById('action-amove')!.addEventListener('click', () => setMode(placement.mode === 'amove' ? '' : 'amove'));
@@ -388,23 +402,35 @@ const production = new ProductionPanel({
   world: () => world,
   player: () => PLAYER,
   activate: type => {
+    if (spectating()) return;
     const def = rules.buildings.get(type);
     const head = def?.producer ? world.players[PLAYER].queues[def.producer]?.[0] : undefined;
     if (def && head && head.type === type && head.reason === 'ready') {
       setMode('place', type);
       return;
     }
-    world.enqueue({ player: PLAYER, kind: 'build', ids: [], x: 0, y: 0, type });
+    issueCommand({ player: PLAYER, kind: 'build', ids: [], x: 0, y: 0, type });
     sfx.play('build');
   },
   cancel: type => {
     if (placement.mode === 'place' && placement.type === type) setMode('');
-    world.enqueue({ player: PLAYER, kind: 'cancel', ids: [], x: 0, y: 0, type });
+    issueCommand({ player: PLAYER, kind: 'cancel', ids: [], x: 0, y: 0, type });
   },
   battlefield: () => canvas.focus(),
 });
 const productionRoot = document.getElementById('production-panel')!;
 productionRoot.addEventListener('focusin', () => cameraInput.releaseKeys());
+for (const button of document.querySelectorAll<HTMLButtonElement>('[data-follow-player]')) {
+  button.addEventListener('click', () => {
+    if (!spectating()) return;
+    const index = Number(button.dataset.followPlayer);
+    const objective = world.entities.find(e => e.owner === index && (rules.buildings.get(e.type)?.capabilities.objective
+      || typeof rules.units.get(e.type)?.capabilities.deploy === 'string'));
+    const start = world.players[index].start;
+    camera.jump(objective ? objective.x / world.subTile : start % map.width, objective ? objective.y / world.subTile : Math.floor(start / map.width));
+    canvas.focus();
+  });
+}
 
 const noticeLine = document.getElementById('production-notice')!;
 function notice(text: string): void { noticeLine.textContent = text.toUpperCase(); }
@@ -440,6 +466,10 @@ const funds = document.getElementById('funds')!;
 const hoverTile = { x: 0, y: 0 };
 const CURSORS = ['cursor-select', 'cursor-move', 'cursor-invalid', 'cursor-harvest', 'cursor-capture', 'cursor-place', 'cursor-sell', 'cursor-repair', 'cursor-deploy', 'cursor-attack'];
 function updateCursor(hovered: Entity | null): void {
+  if (spectating()) {
+    for (const name of CURSORS) canvas.classList.toggle(name, name === 'cursor-select' && hovered !== null);
+    return;
+  }
   let cursor = '';
   const units = selectedUnits();
   const target = hovered && hovered.id > 0 && seen(hovered) ? hovered : null;
@@ -511,8 +541,20 @@ const clockLabel = document.getElementById('clock')!;
 function updateHud(): void {
   const player = world.players[PLAYER];
   clockLabel.textContent = clock(world.tick, rules.game.ticksPerSecond);
-  funds.textContent = String(player?.credits ?? 0);
-  if (player) {
+  funds.textContent = spectating() ? world.players.map(p => p.credits).join(' / ') : String(player?.credits ?? 0);
+  funds.title = spectating() ? 'AI 1 / AI 2 credits' : 'Available credits';
+  if (spectating()) {
+    powerLabel.textContent = '—';
+    powerLabel.classList.remove('is-low');
+    powerLabel.title = 'Both armies’ power is shown in the observer panel';
+    document.getElementById('spectator-summary')!.textContent = world.players.map(p =>
+      `AI ${p.index + 1} · ${rules.factions.get(p.faction)!.name} · $${p.credits} · Power ${p.power.demand}/${p.power.supply}${p.alive ? '' : ' · DEFEATED'}`
+    ).join('\n');
+    for (const button of document.querySelectorAll<HTMLButtonElement>('[data-follow-player]')) {
+      const p = world.players[Number(button.dataset.followPlayer)];
+      button.textContent = `AI ${p.index + 1} · ${rules.factions.get(p.faction)!.name.toUpperCase()} BASE`;
+    }
+  } else if (player) {
     powerLabel.textContent = `${player.power.demand}/${player.power.supply}`;
     powerLabel.classList.toggle('is-low', player.power.demand > player.power.supply);
     powerLabel.title = player.power.demand > player.power.supply ? 'Low power: production runs at a quarter speed' : 'Power demand / supply';
@@ -522,7 +564,7 @@ function updateHud(): void {
   haulButton.hidden = !units.some(u => typeof rules.units.get(u.type)?.capabilities.cargo === 'number');
   stopButton.hidden = units.length === 0;
   amoveButton.hidden = !units.some(u => rules.units.get(u.type)!.weapons.length > 0);
-  production.update();
+  if (!spectating()) production.update();
 }
 
 let lastReport = performance.now();
@@ -621,7 +663,7 @@ function renderFrame(alpha: number, dt: number): void {
   camera.view.y += shakeY;
   selection.prune(world, PLAYER);
   effects.now = presentationTime;
-  fogLayer.update(world, PLAYER);
+  fogLayer.update(world, viewer());
   refreshGhosts();
   const hovered = gameInput.hovered();
   layer.prepare(world, camera.view, alpha, { selected: selection.ids, hovered: hovered ? hovered.id : 0, visible: world.fogEnabled ? seen : null, ghosts: ghostList });
@@ -694,13 +736,13 @@ function checkOutcome(): void {
   if (outcomeSeen < 0) {
     outcomeSeen = performance.now();
     setMode('');
-    const won = world.outcome.winner === PLAYER;
+    const won = spectating() ? !world.outcome.draw : world.outcome.winner === PLAYER;
     sfx.hold(false);
     sfx.play(won ? 'victory' : 'defeat');
   }
   if (performance.now() - outcomeSeen < 2500 || menus.paused) return;
   resultsShown = true;
-  menus.showResults(world, PLAYER, true);
+  menus.showResults(world, viewer(), true);
 }
 
 const menus = new Menus({

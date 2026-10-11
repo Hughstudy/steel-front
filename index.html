@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#26332b" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%2326332b'/%3E%3Cpath d='M16 3 20 12 29 16 20 20 16 29 12 20 3 16 12 12Z' fill='%23e2d3a4'/%3E%3C/svg%3E" />
     <meta name="description" content="Steel Front — an isometric World War II strategy game. Reconnoiter a procedurally generated battlefield." />
     <title>Steel Front</title>
   </head>
@@ -38,7 +39,8 @@
         <dialog id="field-guide" aria-labelledby="guide-title">
           <div class="guide-label">STEEL FRONT · FIELD MANUAL 01</div><button id="help-close" class="guide-close" aria-label="Close field guide">×</button>
           <h2 id="guide-title">Know your ground.</h2>
-          <p>Deploy the construction vehicle into a headquarters, then build a generator, barracks and motor pool from the production panel. Supply trucks haul crates from neutral dumps to your headquarters; engineers capture oil derricks for steady income. Buildings draw power: when demand exceeds supply, production runs at a quarter speed. In combat, AT guns and tanks kill armour, rifles and MGs cut down infantry and gun crews, artillery hits from long range, and fighters own the sky. Units you can't see stay hidden in the fog, and enemy structures you've scouted are remembered as last seen. Units gain veterancy from kills.</p>
+          <p>Deploy the construction vehicle into a headquarters, then build a generator, barracks and motor pool from the production panel. Supply trucks haul crates from neutral dumps to your headquarters; each skirmish base has one nearby infinite supply depot, while other dumps can run dry. Engineers capture oil derricks for steady income. Buildings draw power: when demand exceeds supply, production runs at a quarter speed. In combat, AT guns and tanks kill armour, rifles and MGs cut down infantry and gun crews, artillery hits from long range, and fighters own the sky. Units you can't see stay hidden in the fog, and enemy structures you've scouted are remembered as last seen. Units gain veterancy from kills.</p>
+          <p>Choose Watch AI vs AI in New Skirmish to observe both computer commanders at the same difficulty. The whole battlefield is revealed. Use the base buttons or minimap to jump around, pan and zoom as usual, and click structures to inspect them. The AIs handle all orders and production.</p>
           <dl class="guide-controls"><div><dt>Left click / drag</dt><dd>Select unit / box select · Shift adds</dd></div><div><dt>Right click</dt><dd>Move · on a visible enemy: attack · on a dump: haul · on HQ: unload · engineer on derrick: capture</dd></div><div><dt>Ctrl + right click</dt><dd>Attack-move: engage anything hostile on the way (also the ATTACK-MOVE button)</dd></div><div><dt>Click neutral structure</dt><dd>Show its intel (stock, owner)</dd></div><div><dt>Production panel</dt><dd>Click builds · right-click cancels · ready structure: click, then place on the map</dd></div><div><dt>Focus panel: Q W E R · 1–9</dt><dd>Switch tab · build (Shift cancels) · Esc back to map</dd></div><div><dt>Producer selected + right click</dt><dd>Set rally point</dd></div><div><dt>Selected MCV + right click on it</dt><dd>Deploy headquarters</dd></div><div><dt>Double click</dt><dd>Select visible units of that type</dd></div><div><dt>Ctrl+0–9 / 0–9</dt><dd>Store / recall group · tap twice to centre</dd></div><div><dt>X / Esc</dt><dd>Stop selected / clear selection</dd></div><div><dt>W A S D / arrow keys</dt><dd>Pan camera · Shift for speed</dd></div><div><dt>Pointer at map edges</dt><dd>Edge scroll</dd></div><div><dt>Middle mouse drag</dt><dd>Drag the battlefield</dd></div><div><dt>Mouse wheel / + −</dt><dd>Zoom in and out</dd></div><div><dt>Click or drag minimap</dt><dd>Jump to a sector</dd></div><div><dt>Home</dt><dd>Return to starting position</dd></div><div><dt>G</dt><dd>Show tile grid</dd></div><div><dt>P / F10</dt><dd>Pause · save · load · settings</dd></div><div><dt>M</dt><dd>Mute sound</dd></div></dl>
           <p class="guide-footnote">VICTORY: DESTROY THE ENEMY HEADQUARTERS (OR ITS MCV BEFORE IT DEPLOYS). PROTECT YOUR OWN.<br>P / F10: PAUSE MENU (SAVE, LOAD, SETTINGS) · M: MUTE</p>
           <button id="help-return" class="primary-button">RETURN TO FIELD <span aria-hidden="true">→</span></button>
@@ -46,7 +48,7 @@
         <dialog id="main-menu" class="menu-dialog" aria-labelledby="main-menu-title">
           <div class="guide-label">EUROPEAN THEATER · 1944</div>
           <h2 id="main-menu-title" class="menu-title">STEEL <b>FRONT</b></h2>
-          <p>Command an Allied or Axis battle group. Deploy your headquarters, secure supply and oil, and destroy the enemy command post.</p>
+          <p>Command an Allied or Axis battle group, or watch two AI commanders fight. Deploy headquarters, secure supply and oil, and destroy the opposing command post.</p>
           <div class="menu-buttons">
             <button class="primary-button" id="menu-new">NEW SKIRMISH <span aria-hidden="true">→</span></button>
             <button class="menu-button" id="menu-continue" hidden>RETURN TO BATTLE</button>
@@ -63,11 +65,12 @@
         <dialog id="skirmish-setup" class="menu-dialog wide" aria-labelledby="setup-title">
           <div class="guide-label">NEW SKIRMISH</div><button class="guide-close" data-back aria-label="Back">×</button>
           <h2 id="setup-title">Prepare the battle.</h2>
-          <fieldset class="choice-group"><legend>YOUR FACTION</legend><div class="choices" id="setup-factions"></div></fieldset>
+          <fieldset class="choice-group"><legend>MATCH MODE</legend><div class="choices" id="setup-modes"></div></fieldset>
+          <fieldset class="choice-group"><legend id="setup-faction-label">YOUR FACTION</legend><div class="choices" id="setup-factions"></div></fieldset>
           <fieldset class="choice-group"><legend>BATTLEFIELD</legend><div class="choices" id="setup-maps"></div></fieldset>
-          <fieldset class="choice-group"><legend>COMPUTER OPPONENT</legend><div class="choices" id="setup-difficulties"></div></fieldset>
+          <fieldset class="choice-group"><legend id="setup-difficulty-label">COMPUTER OPPONENT</legend><div class="choices" id="setup-difficulties"></div></fieldset>
           <p id="setup-summary" class="setup-summary"></p>
-          <div class="dialog-actions"><button class="menu-button" data-back>BACK</button><button class="primary-button" id="setup-start">START BATTLE <span aria-hidden="true">→</span></button></div>
+          <div class="dialog-actions"><button class="menu-button" data-back>BACK</button><button class="primary-button" id="setup-start"><span id="setup-start-label">START BATTLE</span><span aria-hidden="true">→</span></button></div>
         </dialog>
         <dialog id="pause-menu" class="menu-dialog" aria-labelledby="pause-title">
           <div class="guide-label">GAME PAUSED</div>
@@ -105,7 +108,7 @@
           <h2 id="results-title">Victory.</h2>
           <p id="results-text"></p>
           <table class="results-table" id="results-table"></table>
-          <div class="dialog-actions"><button class="menu-button" id="results-view">VIEW BATTLEFIELD</button><button class="menu-button" id="results-menu">MAIN MENU</button><button class="primary-button" id="results-again">PLAY AGAIN <span aria-hidden="true">→</span></button></div>
+          <div class="dialog-actions"><button class="menu-button" id="results-view">VIEW BATTLEFIELD</button><button class="menu-button" id="results-menu">MAIN MENU</button><button class="primary-button" id="results-again"><span id="results-again-label">PLAY AGAIN</span><span aria-hidden="true">→</span></button></div>
         </dialog>
       </main>
       <footer class="command-bar">
@@ -123,6 +126,12 @@
           <div class="production-head"><div class="production-tabs" id="production-tabs" role="toolbar" aria-label="Production categories"></div><div class="mode-buttons"><button id="mode-repair" class="command-button" aria-pressed="false" title="Repair mode: click your damaged buildings (right-click cancels)">REPAIR</button><button id="mode-sell" class="command-button" aria-pressed="false" title="Sell mode: click your building to sell it (right-click cancels)">SELL</button></div></div>
           <div class="production-items" id="production-items"></div>
           <div class="production-foot"><span id="production-notice" aria-live="polite"></span><span class="production-hint">Click to build · right-click cancels · ready structures: click, then place</span><span class="production-focus" aria-hidden="true">KEYS: Q W E TABS · 1–9 BUILD · ESC TO MAP</span></div>
+        </section>
+        <section class="operation-panel spectator-panel" id="spectator-panel" aria-label="AI battle observer" hidden>
+          <span class="eyebrow">AI VS AI · OBSERVER</span>
+          <p id="spectator-summary" aria-live="off"></p>
+          <div class="spectator-controls"><button class="command-button" data-follow-player="0" title="Centre camera on the first AI base">AI 1 BASE</button><button class="command-button" data-follow-player="1" title="Centre camera on the second AI base">AI 2 BASE</button></div>
+          <p class="spectator-help">Pan / zoom to explore · click structures for intel</p>
         </section>
         <section class="minimap-panel" aria-label="Tactical minimap"><div class="minimap-header"><span>SECTOR OVERVIEW</span><span class="map-size">128 × 128</span></div><canvas id="minimap" aria-label="Tactical minimap. Click or drag to move the camera." tabindex="0"></canvas><span class="north-marker" aria-hidden="true">N <span>↑</span></span></section>
       </footer>

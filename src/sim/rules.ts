@@ -65,6 +65,8 @@ export interface ScenarioDef {
   camera: { x: number; y: number }; players: ScenarioPlayer[];
   /** Place the map preset's supply dumps and oil derricks. */
   resources: boolean;
+  /** Also place each base's endless truck supply site (normal skirmishes). */
+  infiniteSupplies?: boolean;
   /** Fog of war and shroud (default on). */
   fog: boolean;
   /** Objective rule active: losing the MCV (before deployment) or HQ ends a player's match. */
@@ -87,6 +89,8 @@ export interface BuildingCapabilities {
   objective?: boolean;
   /** Supply stock held by a dump (credits). */
   supply?: number;
+  /** Trucks may load repeatedly without reducing this building's supply stock. */
+  infiniteSupply?: boolean;
   /** Pays oil income to its owner. */
   oil?: boolean;
   /** Engineers may capture it. */
@@ -133,6 +137,9 @@ export interface MapPreset {
   palette: Record<string, string>;
   /** Building types placed at the supply and derrick points. */
   supplyType: string; derrickType: string;
+  /** Additional non-depleting sites, in player-spawn order. */
+  infiniteSupplies: MapPoint[];
+  infiniteSupplyType: string;
 }
 
 /** Computer opponent plan for one faction (types are data ids). */
@@ -424,6 +431,9 @@ export function loadRules(raw: RawRules): Rules {
     if (def.faction !== NEUTRAL && !factions.has(def.faction)) check.errors.push(`${where}.faction: unknown faction ${def.faction}`);
     const supply = def.capabilities.supply;
     if (supply !== undefined && (typeof supply !== 'number' || !Number.isInteger(supply) || supply < 0)) check.errors.push(`${where}.capabilities.supply: expected a non-negative integer`);
+    const infinite = def.capabilities.infiniteSupply;
+    if (infinite !== undefined && typeof infinite !== 'boolean') check.errors.push(`${where}.capabilities.infiniteSupply: expected a boolean`);
+    if (infinite === true && (!(typeof supply === 'number' && supply > 0) || def.dockSlots < 1)) check.errors.push(`${where}.capabilities.infiniteSupply: requires positive supply stock and at least one dock`);
     buildings.set(def.id, def);
   });
   for (const unit of units.values()) {
@@ -572,9 +582,15 @@ export function loadRules(raw: RawRules): Rules {
       generation, palette: palette as Record<string, string>,
       spawns: points(r.spawns, `${where}.spawns`), supplies: points(r.supplies, `${where}.supplies`), derricks: points(r.derricks, `${where}.derricks`),
       supplyType: check.string(r, 'supplyType', where), derrickType: check.string(r, 'derrickType', where),
+      infiniteSupplies: points(r.infiniteSupplies ?? [], `${where}.infiniteSupplies`),
+      infiniteSupplyType: r.infiniteSupplyType === undefined ? '' : check.string(r, 'infiniteSupplyType', where),
     };
     if (!buildings.has(preset.supplyType)) check.errors.push(`${where}.supplyType: unknown building ${preset.supplyType}`);
     if (!buildings.has(preset.derrickType)) check.errors.push(`${where}.derrickType: unknown building ${preset.derrickType}`);
+    if (preset.infiniteSupplies.length > 0) {
+      if (buildings.get(preset.infiniteSupplyType)?.capabilities.infiniteSupply !== true) check.errors.push(`${where}.infiniteSupplyType: expected a building with infiniteSupply`);
+      if (preset.infiniteSupplies.length !== preset.spawns.length) check.errors.push(`${where}.infiniteSupplies: need one site per player spawn`);
+    }
     if (preset.spawns.length < 2) check.errors.push(`${where}.spawns: need at least two player spawns`);
     if (maps.has(preset.id)) check.errors.push(`${where}: duplicate map id ${preset.id}`);
     maps.set(preset.id, preset);
@@ -646,6 +662,7 @@ export function loadRules(raw: RawRules): Rules {
     const def: ScenarioDef = {
       id: check.string(r, 'id', where), name: check.string(r, 'name', where), description: check.string(r, 'description', where),
       map: check.string(r, 'map', where), resources: r.resources === true, fog: r.fog !== false, victory: r.victory === true,
+      infiniteSupplies: r.infiniteSupplies === true,
       camera: { x: check.number(camera, 'x', `${where}.camera`, 0, 1023), y: check.number(camera, 'y', `${where}.camera`, 0, 1023) },
       players: check.array(r.players, `${where}.players`).map((p, pi) => {
         const pw = `${where}.players[${pi}]`;

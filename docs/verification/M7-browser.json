@@ -1,0 +1,76 @@
+[
+  {
+    "initial": {
+      "setup": {
+        "kind": "skirmish",
+        "faction": "allies",
+        "map": "lowlands",
+        "difficulty": "normal",
+        "mode": "spectate"
+      },
+      "ais": [
+        "normal",
+        "normal"
+      ],
+      "simFog": true,
+      "viewFog": false,
+      "supplies": 2
+    }
+  },
+  {
+    "observerInput": "both bases inspectable; pointer, hotkeys and hidden actions issue no commands"
+  },
+  {
+    "activity": [
+      {
+        "built": 5,
+        "units": 5,
+        "delivered": 2400
+      },
+      {
+        "built": 5,
+        "units": 5,
+        "delivered": 3000
+      }
+    ]
+  },
+  {
+    "infiniteSiteInspection": "NEUTRAL · ∞ INFINITE SUPPLIES · docks 1/3"
+  },
+  {
+    "saveLoad": {
+      "tick": 3657,
+      "mode": "spectate",
+      "ai": [
+        "normal",
+        "normal"
+      ],
+      "fog": false
+    }
+  },
+  {
+    "battle": {
+      "tick": 50304,
+      "outcome": {
+        "tick": 50304,
+        "winner": 0,
+        "draw": false
+      },
+      "waves": [
+        10,
+        8
+      ]
+    },
+    "title": "Allies victory."
+  },
+  {
+    "normalPlay": {
+      "ai": null,
+      "fog": true
+    }
+  },
+  {
+    "console": [],
+    "narrow": "630x880 no page overflow"
+  }
+]

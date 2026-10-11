@@ -6,7 +6,7 @@ import type { World } from '../sim/world.ts';
 import type { Selection } from './selection.ts';
 
 export interface GameInputHost {
-  /** The local player's index; selection only ever contains their entities. */
+  /** The local player's index, or -1 for an observer with no selectable entities. */
   player(): number;
   world(): World;
   /** Right-click on ground/entity with the given tile (floating centre coordinates). */
@@ -68,7 +68,8 @@ export class GameInput {
   hovered(): Entity | null {
     if (this.pointerX < 0 || this.box.active) return null;
     this.camera.screenToWorld(this.pointerX, this.pointerY, this.scratch);
-    return this.layer.pick(this.scratch.x, this.scratch.y, entity => this.host.selectable(entity) || entity.owner !== this.host.player());
+    const player = this.host.player();
+    return this.layer.pick(this.scratch.x, this.scratch.y, entity => player < 0 || this.host.selectable(entity) || entity.owner !== player);
   }
 
   pointerTile(out: { x: number; y: number }): boolean {

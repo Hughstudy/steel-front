@@ -147,7 +147,7 @@ export class Menus {
   private readonly host: MenuHost;
   private readonly dialogs: Record<'main' | 'setup' | 'pause' | 'slots' | 'settings' | 'results' | 'guide', HTMLDialogElement>;
   private slotMode: 'save' | 'load' = 'load';
-  private setup: { faction: string; map: string; difficulty: string };
+  private setup: { faction: string; map: string; difficulty: string; mode: 'play' | 'spectate' };
 
   constructor(host: MenuHost) {
     this.host = host;
@@ -160,7 +160,7 @@ export class Menus {
     this.stack.sticky.add(this.dialogs.main);
     this.stack.sticky.add(this.dialogs.results);
     this.stack.onEmpty = () => host.resume();
-    this.setup = { faction: rules.skirmish.defaultFaction, map: rules.skirmish.defaultMap, difficulty: rules.ai.defaultDifficulty };
+    this.setup = { faction: rules.skirmish.defaultFaction, map: rules.skirmish.defaultMap, difficulty: rules.ai.defaultDifficulty, mode: 'play' };
     for (const dialog of Object.values(this.dialogs)) dialog.addEventListener('click', event => { if ((event.target as HTMLElement).closest('button')) host.click(); });
 
     // Main menu.
@@ -174,6 +174,10 @@ export class Menus {
     element('dev-start').addEventListener('click', () => host.start({ kind: 'scenario', id: dev.value, difficulty: this.setup.difficulty }));
 
     // Skirmish setup: radio cards built from data.
+    element('setup-modes').append(
+      this.choice('mode', 'play', 'Play vs AI', 'Command your faction against the computer'),
+      this.choice('mode', 'spectate', 'Watch AI vs AI', 'Observe two computer commanders battle'),
+    );
     const factions = element('setup-factions');
     for (const faction of rules.factions.values()) {
       factions.append(this.choice('faction', faction.id, faction.name, faction.id === 'allies' ? 'US Army · Sherman, M10, P-47' : 'Wehrmacht · Panzer IV, Tiger, Bf 109', faction.team));
@@ -237,9 +241,14 @@ export class Menus {
 
   private describeSetup(): void {
     const rules = this.host.rules;
+    const spectating = this.setup.mode === 'spectate';
     const enemy = Array.from(rules.factions.values()).find(f => f.id !== this.setup.faction)!;
+    element('setup-faction-label').textContent = spectating ? 'FIRST AI FACTION' : 'YOUR FACTION';
+    element('setup-difficulty-label').textContent = spectating ? 'DIFFICULTY FOR BOTH AIs' : 'COMPUTER OPPONENT';
+    element('setup-start-label').textContent = spectating ? 'WATCH BATTLE' : 'START BATTLE';
     element('setup-summary').textContent = `${rules.factions.get(this.setup.faction)!.name} vs ${enemy.name} (${rules.ai.difficulties.get(this.setup.difficulty)!.name}) on ${rules.maps.get(this.setup.map)!.name}. `
-      + `Both sides start with one MCV and ${rules.skirmish.credits} credits. Destroy the enemy MCV or headquarters to win.`;
+      + `Both sides start with one MCV, ${rules.skirmish.credits} credits and an infinite supply depot nearby. `
+      + (spectating ? 'Both sides are AI-controlled. Explore the revealed battlefield while they fight for victory.' : 'Destroy the enemy MCV or headquarters to win.');
   }
 
   showMain(): void {
@@ -263,18 +272,21 @@ export class Menus {
   showResults(world: World, player: number, again: boolean): void {
     const outcome = world.outcome!;
     const rules = world.rules;
-    const won = outcome.winner === player;
+    const spectating = player < 0;
+    const won = !spectating && !outcome.draw && outcome.winner === player;
+    const winnerName = outcome.draw ? '' : rules.factions.get(world.players[outcome.winner].faction)!.name;
     const dialog = this.dialogs.results;
-    dialog.classList.toggle('victory', won);
-    dialog.classList.toggle('defeat', !won && !outcome.draw);
+    dialog.classList.toggle('victory', won || (spectating && !outcome.draw));
+    dialog.classList.toggle('defeat', !spectating && !won && !outcome.draw);
     element('results-label').textContent = `BATTLE REPORT · ${clock(outcome.tick, rules.game.ticksPerSecond)}`;
-    element('results-title').textContent = outcome.draw ? 'Stalemate.' : won ? 'Victory.' : 'Defeat.';
+    element('results-title').textContent = outcome.draw ? 'Stalemate.' : spectating ? `${winnerName} victory.` : won ? 'Victory.' : 'Defeat.';
     element('results-text').textContent = outcome.draw
       ? 'Both command posts fell in the same moment. Neither side holds the field.'
-      : won ? 'The enemy command post is destroyed. The sector is yours.' : 'Your command has been destroyed. The sector is lost.';
+      : spectating ? `${winnerName} AI destroyed the opposing command post and holds the sector.`
+        : won ? 'The enemy command post is destroyed. The sector is yours.' : 'Your command has been destroyed. The sector is lost.';
     const table = element<HTMLTableElement>('results-table');
     const players = world.players;
-    const name = (index: number): string => `${index === player ? 'YOU' : 'ENEMY'} · ${rules.factions.get(players[index].faction)!.name.toUpperCase()}`;
+    const name = (index: number): string => `${spectating ? 'AI' : index === player ? 'YOU' : 'ENEMY'} · ${rules.factions.get(players[index].faction)!.name.toUpperCase()}`;
     const rows: Array<[string, (index: number) => number | string]> = [
       ['Units produced', i => players[i].stats.unitsBuilt],
       ['Units lost', i => players[i].stats.unitsLost],
@@ -283,10 +295,11 @@ export class Menus {
       ['Credits earned', i => players[i].ledger.delivered + players[i].ledger.oil],
       ['Credits spent', i => players[i].ledger.spent - players[i].ledger.refunded],
     ];
-    const order = [player, ...players.map(p => p.index).filter(i => i !== player)];
+    const order = spectating ? players.map(p => p.index) : [player, ...players.map(p => p.index).filter(i => i !== player)];
     const head = `<thead><tr><th></th>${order.map(i => `<th>${name(i)}</th>`).join('')}</tr></thead>`;
     const body = rows.map(([label, value]) => `<tr><td>${label}</td>${order.map(i => `<td>${value(i)}</td>`).join('')}</tr>`).join('');
     table.innerHTML = head + `<tbody>${body}</tbody>`;
+    element('results-again-label').textContent = spectating ? 'WATCH AGAIN' : 'PLAY AGAIN';
     element('results-again').hidden = !again;
     this.resultsReady = true;
     this.stack.reset(dialog);

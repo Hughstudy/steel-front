@@ -1,7 +1,7 @@
 # Steel Front
 
 ## Mission
-A single-player, WW2 browser RTS in the spirit of Red Alert 2. Deploy as pure static files to Caddy on a Linux VM. Build exactly one milestone per session; every milestone ends playable.
+A single-player, WW2 browser RTS in the spirit of Red Alert 2. Deploy as pure static files to GitHub Pages or Caddy. Build exactly one milestone per session; every milestone ends playable.
 
 ## Working agreements
 - Start by reading this file and STATUS.md. Finish by updating STATUS.md (done / next / known issues), validating, and committing.
@@ -52,3 +52,8 @@ Armor/damage classes, projectiles, turret rotation, veterancy, unexplored shroud
 /data/ai.json scripted build orders, base construction, economy expansion, escalating mixed waves, base defense. Difficulty changes data knobs only.
 ### M6 — Game frame
 Menu → skirmish faction/map/difficulty, win/lose on HQ destruction, WebAudio synthesized SFX, localStorage save/load, explosions/screenshake/day tint. Acceptance: complete match without dev tools.
+
+### M7 — AI observer and renewable supplies
+Add an AI-versus-AI choice to skirmish setup, with camera controls, full battlefield observation, neutral winner results and save/load. Both AI players retain normal fog-of-war rules. Place one infinite truck supply site near each base on both skirmish maps; finite dumps remain finite and trucks must still load, haul and unload for income. Keep delivery as static files compatible with GitHub Pages.
+
+Acceptance: both AI players deploy, build, haul and fight without player commands; observer input cannot command either army; results identify the winning faction; observer saves continue deterministically; both bases have reachable infinite supplies that survive repeated loads; normal skirmish and finite-dump depletion still work. Run the tests, production build and dev-browser checks, update STATUS.md and commit this single milestone.

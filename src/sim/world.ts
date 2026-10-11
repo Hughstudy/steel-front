@@ -252,6 +252,10 @@ export class World {
       const derrick = this.rules.buildings.get(preset.derrickType)!;
       for (const p of preset.supplies) this.placeBuildingNear(dump, -1, p.x, p.y);
       for (const p of preset.derricks) this.placeBuildingNear(derrick, -1, p.x, p.y);
+      if (scenario.infiniteSupplies) {
+        const source = this.rules.buildings.get(preset.infiniteSupplyType)!;
+        for (const p of preset.infiniteSupplies) this.placeBuildingNear(source, -1, p.x, p.y);
+      }
     }
     for (const setup of scenario.players) {
       const player = this.addPlayer(setup.faction, setup.credits);

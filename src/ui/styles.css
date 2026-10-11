@@ -1,6 +1,7 @@
 :root{font-family:Arial,Helvetica,sans-serif;color:#e5e5d0;background:#1d2924;font-synthesis:none;font-weight:400;--ink:#e5e5d0;--muted:#9fa990;--line:#495340;--accent:#d5c08a;--hud:#29332a}
 
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 
 html,body,#app{height:100%;width:100%;margin:0;overflow:hidden}
 button,a{-webkit-tap-highlight-color:transparent}
@@ -221,7 +222,15 @@ dialog p{color:#c0ccb2;font-size:12px;line-height:1.7}
 .production-foot{display:flex;gap:10px;align-items:center;font-size:9px;min-height:11px}
 #production-notice{color:#ef9b72;letter-spacing:.8px;font-weight:bold}
 .production-hint{color:#8b9475;margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.spectator-panel{display:flex;flex-direction:column;align-self:stretch;justify-content:center;gap:8px;min-width:0}
+.spectator-panel #spectator-summary{white-space:pre-line;font-family:'Courier New',monospace;font-size:11px;line-height:1.6;color:#e1d8b5}
+.spectator-controls{display:flex;gap:6px;flex-wrap:wrap}
+.spectator-controls .command-button{padding:5px 8px}
+.spectator-panel .spectator-help{font-size:9px;color:#aeb79a}
+.spectating .resources,.spectating .resource b{flex-shrink:0;white-space:nowrap}
+@media(max-width:800px){.spectating .resource:has(#funds),.spectating .resource:has(#power){display:none}.spectating #pause-button{margin-left:0}}
 @media(max-width:800px){.operation-panel.production-panel{display:flex}.command-bar{grid-template-columns:minmax(0,1fr) 150px}.info-slot{display:none}.production-hint,.production-focus{display:none}}
+@media(max-width:800px){.operation-panel.spectator-panel{display:flex;gap:5px}.spectator-panel #spectator-summary{font-size:10px;line-height:1.5}.spectator-panel .spectator-help{font-size:8px}}
 #battlefield.cursor-attack{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cg fill='none' stroke='%23180c08' stroke-width='4'%3E%3Ccircle cx='12' cy='12' r='7'/%3E%3Cpath d='M12 1v6M12 17v6M1 12h6M17 12h6'/%3E%3C/g%3E%3Cg fill='none' stroke='%23ff5a3c' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='7'/%3E%3Cpath d='M12 1v6M12 17v6M1 12h6M17 12h6'/%3E%3C/g%3E%3C/svg%3E") 12 12,crosshair}
 .top-button{border:1px solid #6c7659;background:#394433;padding:6px 9px;font-weight:bold;font-size:9px;letter-spacing:1px;color:#e2d9b4;white-space:nowrap}
 .top-button b{color:#d8f08a;margin-left:4px}

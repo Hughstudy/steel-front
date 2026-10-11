@@ -1,5 +1,17 @@
 # Steel Front status
 
+## Done — M7: AI observer and renewable supplies
+Completed 2026-10-11. New Skirmish now offers **Play vs AI** and **Watch AI vs AI**. Watch mode runs two computer commanders at the selected difficulty, exposes the full battlefield to the observer, and provides base-focus buttons and both armies' funds/power. Each AI still follows its own fog of war. Inspection, camera controls, pause, save/load and Watch Again work; the observer cannot issue army or production commands. Results name the winning faction.
+
+- Both maps now have **one Infinite Supply Yard near each base**, marked ∞. Trucks still load, haul and unload normally; the yards never deplete. Existing finite dumps and development exercises retain their behavior.
+- Added ten regressions covering setup/fog, human/observer input, natural AI match completion, save continuation, both maps' resource access, repeated hauling beyond the original stock limit and data validation.
+- `npm test`: **104/104 pass**. `npm run build` and `git diff --check`: pass. No dependency changes.
+- Real browser input on the dev server and production preview under `/steel-front/`: setup, both base buttons, inspection, pointer/hotkey command lockout, supply-yard ∞ details, save/load, Watch Again and return to normal Axis/Ardennes play. An accelerated autonomous Regular/Lowlands match ended in **Allies victory at 41:55 (tick 50304)**; both sides built bases, hauled and attacked. Final browser checks had no console warnings/errors. Layout checks pass at 550, 630 and 1280 px.
+- Independent integration review found a neutral-structure observer-hover issue; it was reproduced, fixed and covered by a regression. Final review found no other actionable defects.
+- **Delivery:** local source and production build prepared; GitHub Pages has not been republished in this session. Evidence: `docs/verification/M7.md`.
+- **Next:** publish the tested build when requested, then user playtesting. No additional gameplay milestone is planned.
+- **Known issues:** older saves are rejected by the existing rules-hash policy because building/map data changed. New saves resume deterministically. Audio by ear and sustained target-laptop frame pacing remain unverified; the AI completion check advances simulation ticks rather than waiting 42 minutes in real time.
+
 ## Done — aircraft review fixes and release verification
 Completed 2026-10-10. Fighters now finish explicit move/rally orders before automatically engaging, and close targets trigger an escape/re-approach pass instead of an endless non-firing orbit. Attack, attack-move and stop replace the previous flight order. Flight state survives save/load, including older version-1 saves.
 

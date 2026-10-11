@@ -1,6 +1,12 @@
 # Steel Front
 
-WW2-themed, isometric browser RTS. **Current milestone: M6 — complete match and static delivery (all planned milestones done).** From the main menu, start a skirmish: pick Allies or Axis, The Lowlands or The Ardennes, and a Recruit / Regular / Veteran computer opponent. Deploy your MCV, build a base, and destroy the enemy HQ under fog of war; lose your HQ (or your MCV before it deploys) and you are defeated. Supply trucks and oil fund production, and combat uses data-driven weapons and armour. Matches can be saved to three browser slots and continued later. Higher AI difficulties attack harder and also earn more (Recruit 75% income, Veteran 130%; see BALANCE.md).
+WW2-themed, isometric browser RTS. **Current milestone: M7 — AI observer and renewable supplies.** From the main menu, start a skirmish: pick Play vs AI or Watch AI vs AI, Allies or Axis, The Lowlands or The Ardennes, and Recruit / Regular / Veteran difficulty. In Play mode, deploy your MCV, build a base, and destroy the enemy HQ under fog of war; lose your HQ (or your MCV before it deploys) and you are defeated. Supply trucks and oil fund production, and combat uses data-driven weapons and armour. Matches can be saved to three browser slots and continued later. Higher AI difficulties attack harder and also earn more (Recruit 75% income, Veteran 130%; see BALANCE.md).
+
+**Watch AI vs AI:** both armies build and fight autonomously at the selected difficulty. Observe the full battlefield, inspect units and structures, use the two base buttons or minimap to move the camera, and pause/save/load as usual. The AIs retain their own fog of war; the observer cannot command either army. Results name the winning faction, and Watch Again repeats the setup.
+
+**Infinite Supply Yards:** each base on both skirmish maps has a nearby neutral yard marked **∞**. Trucks load, haul to HQ and unload at the usual rates, but the yard never runs out. The other supply dumps still deplete. These sites are available in both Play and Watch modes; development exercises keep their original resources.
+
+Saves require identical game data. The new supply/map data means saves from releases before M7 are incompatible; new matches save and resume normally.
 
 Play the published game at **https://hughstudy.github.io/steel-front/**.
 
