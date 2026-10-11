@@ -1,0 +1,19 @@
+{
+  "version": {
+    "sourceCommit": "169bb693ce3c7e3aee3df3393fc75aa280caa594"
+  },
+  "files": [
+    {
+      "path": "index.html",
+      "sha256": "e6422eb8c10b91efd6cf191ca8382ed816789a149b24c5a905a29fa89889d61f"
+    },
+    {
+      "path": "assets/index-BBYOC2fZ.js",
+      "sha256": "b7e4c5a10def26a95da71a7d6858d05042ef37f48aa45a20e3979adfb13eb45d"
+    },
+    {
+      "path": "assets/index-CYczLotY.css",
+      "sha256": "0429f901081ff69440cdd41c3888988580770228de71f4611428c108516bed9c"
+    }
+  ]
+}

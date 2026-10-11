@@ -6,8 +6,8 @@ Completed 2026-10-11. New Skirmish includes **Infinite supplies near bases**, en
 - M7 saves remain compatible: an omitted option defaults to enabled. No game-data, rules-hash, save-version or dependency changes.
 - `npm test`: **108/108 pass**. `npm run build` and `git diff --check`: pass. Four new regressions cover resource counts, saved settings, exact continuation, restart, legacy saves and invalid values.
 - Dev browser, real input: all eight mode/map/on-off combinations, both resource choices through save/load and Again buttons, keyboard checkbox operation and setup layouts at 550/630/1280 px. No console warnings/errors. Independent integration review found no actionable issues.
-- **Delivery:** tested source/build prepared for publication. Evidence: `docs/verification/M8.md`.
-- **Next:** publish and verify this update, then user playtesting. No other gameplay work is planned.
+- **Published:** https://hughstudy.github.io/steel-front/ — runtime source `169bb69`, Pages deployment `bdab3d8`, status `built`. Public files match the release bytes. Live browser checks passed all eight mode/map/on-off combinations, save/load, Again buttons and keyboard controls with no console warnings/errors. Evidence: `docs/verification/M8.md`.
+- **Next:** user playtesting. No other gameplay work is planned.
 - **Known issues:** existing pre-M7 save incompatibility, audio-by-ear and sustained target-laptop performance limitations remain unchanged.
 
 ## Done — M7: AI observer and renewable supplies
